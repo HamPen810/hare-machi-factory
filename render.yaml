@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: hare-machi-factory
+    runtime: python
+    plan: free
+    buildCommand: python -m zipfile -e hare-machi-render.zip app && pip install -r app/requirements.txt
+    startCommand: python app/server.py --bind 0.0.0.0 --public-origin "$RENDER_EXTERNAL_URL"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: HARE_FACTORY_DATABASE_URL
+        sync: false
