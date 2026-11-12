@@ -1,0 +1,43 @@
+name: Measure real outbound response bytes
+on:
+  push:
+    paths:
+      - .github/workflows/measure-bandwidth.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Instrument current production ZIP without changing game behavior
+        run: python deployment/add-bandwidth-meter.py
+      - name: Validate deployed Python and route meter
+        run: |
+          python - <<'PY'
+          import ast, io,zipfile
+          with zipfile.ZipFile("hare-machi-render.zip") as z:
+              source=z.read("server.py").decode()
+              ast.parse(source)
+              assert source.count("BANDWIDTH_REPORT")==1
+              assert "raw_length=len(data)" in source
+              assert "measure_bandwidth(self.command" in source
+              assert source.index("measure_bandwidth(self.command") < source.index("self.send_response(status)")
+              assert "self.path.split('?',1)[0]" in source
+              assert "window_s" in source and "total_bytes" in source
+              print("PASS: meter records compressed bytes and excludes sensitive request details")
+          PY
+      - name: Commit ZIP to deploy existing Render services
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Log aggregated outbound bytes by route and response type"
+            git push
+          fi
