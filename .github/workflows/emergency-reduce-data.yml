@@ -1,0 +1,67 @@
+name: Emergency Reduce Game Data API Load
+on:
+  push:
+    paths:
+      - .github/workflows/emergency-reduce-data.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-recover:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d testdb"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reduce response size and full-history JSON scans
+        run: python deployment/emergency-reduce-game-data-load.py
+      - name: Validate PostgreSQL aggregation and existing game interfaces
+        run: |
+          pip -q install 'psycopg[binary]'
+          python - <<'PY'
+          import ast,psycopg
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              market=z.read('market.py').decode()
+              ast.parse(market)
+              assert 'start=max(0,end-59)' in market
+              assert 'start=max(0,after,end-59)' in market
+              assert "X-Timeline-Before" in market
+              assert "SELECT payload::jsonb->>0 AS kind," in market
+              assert 'SUM(COALESCE((result::jsonb->>\'spent\')::numeric,0)) AS spent' in market
+              for name in ('market.py','accounts.py','bank.py','exact.py','admin_fund_ops.py','admin_forgive_fast.py'):
+                  Path('/tmp',name).write_bytes(z.read(name))
+          db=psycopg.connect('postgresql://tester:tester@127.0.0.1:5432/testdb',autocommit=True)
+          try:
+              db.execute('CREATE TABLE actions(player TEXT,payload TEXT,result TEXT)')
+              db.execute("INSERT INTO actions VALUES('p','[\"upgrade\",1]','{\"spent\":123}')")
+              db.execute("INSERT INTO actions VALUES('p','[\"upgrade\",2]','{\"spent\":77}')")
+              db.execute("INSERT INTO actions VALUES('p','[\"unlock\",1]','{\"spent\":\"500\"}')")
+              db.execute("INSERT INTO actions VALUES('other','[\"upgrade\",1]','{\"spent\":999}')")
+              q="SELECT payload::jsonb->>0 AS kind, SUM(COALESCE((result::jsonb->>'spent')::numeric,0)) AS spent FROM actions WHERE player=%s GROUP BY payload::jsonb->>0"
+              result=dict(db.execute(q,('p',)).fetchall())
+              assert result=={'upgrade':200,'unlock':500},result
+          finally:db.close()
+          print('PASS PostgreSQL actions aggregation and 60-minute pagination')
+          PY
+          PRODUCTION_MODULE_DIR=/tmp python deployment/test-fast-debt-forgiveness.py
+          PRODUCTION_MODULE_DIR=/tmp python deployment/test-extra-student-slots.py
+      - name: Publish validated ZIP to existing Render services
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Emergency: bound timeline page size and aggregate expenses in PostgreSQL"; git push; }
