@@ -1,0 +1,43 @@
+name: Deploy debt forgiveness and wealth-based batch funds
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-admin-debt-bulk.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply scoped patch to current production archive
+        run: python deployment/add-admin-debt-bulk.py
+      - name: Validate banking, accounting and admin UI
+        run: |
+          mkdir -p /tmp/debt-bulk-test
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.py','accounts.py','exact.py','bank.py','market.py','event.py','admin_fund_ops.py'):
+                  Path('/tmp/debt-bulk-test',name).write_bytes(z.read(name))
+              Path('/tmp/admin-debt-bulk.js').write_bytes(z.read('static/admin.js'))
+              h=z.read('static/admin.html').decode()
+              assert '借金帳消し' in h
+              assert 'id="bulk-funds-form"' in h
+              assert 'id="bulk-preview-table"' in h
+              s=z.read('server.py').decode()
+              assert "self.path=='/api/admin/funds-extra'" in s
+              assert "perform(admin,data,now)" in s
+          PY
+          PYTHONPATH=/tmp/debt-bulk-test python deployment/test-admin-debt-bulk.py
+          PYTHONPATH=/tmp/debt-bulk-test python deployment/test-overdraft-admin-collections.py
+          PYTHONPATH=/tmp/debt-bulk-test python deployment/test-admin-online-chart.py
+          node --check /tmp/admin-debt-bulk.js
+      - name: Commit tested ZIP to trigger Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Add administrator debt forgiveness and wealth-filtered bulk operations"; git push; }
