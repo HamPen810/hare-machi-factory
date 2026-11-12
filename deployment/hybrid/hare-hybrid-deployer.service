@@ -1,0 +1,20 @@
+[Unit]
+Description=Hare Machi Factory Signed Oracle Deployment Webhook
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=harehybrid
+Group=harehybrid
+WorkingDirectory=/opt/hare-hybrid/current
+EnvironmentFile=/etc/hare-hybrid.env
+ExecStart=/opt/hare-hybrid/current/venv/bin/python /opt/hare-hybrid/current/oracle_deploy_agent.py
+Restart=always
+RestartSec=4
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
