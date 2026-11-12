@@ -42,7 +42,7 @@ jobs:
               assert "X-Timeline-Before" in market
               assert "SELECT payload::jsonb->>0 AS kind," in market
               assert 'SUM(COALESCE((result::jsonb->>\'spent\')::numeric,0)) AS spent' in market
-              for name in ('market.py','accounts.py','bank.py','exact.py','admin_fund_ops.py','admin_forgive_fast.py'):
+              for name in ('market.py','accounts.py','bank.py','exact.py','event.py','admin.py','postgres.py','admin_fund_ops.py','admin_forgive_fast.py'):
                   Path('/tmp',name).write_bytes(z.read(name))
           db=psycopg.connect('postgresql://tester:tester@127.0.0.1:5432/testdb',autocommit=True)
           try:
@@ -65,3 +65,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add hare-machi-render.zip
           git diff --cached --quiet || { git commit -m "Emergency: bound timeline page size and aggregate expenses in PostgreSQL"; git push; }
+
+# Live-schema and legacy regression fixtures validated by diagnostic workflow.
