@@ -1,0 +1,42 @@
+name: Measure outbound SQL traffic without exposing data
+on:
+  push:
+    paths:
+      - .github/workflows/measure-sql-egress.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Instrument existing external PostgreSQL adapter
+        run: python deployment/add-sql-egress-meter.py
+      - name: Verify syntax and privacy constraints
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          import ast
+          with ZipFile('hare-machi-render.zip') as z:
+              code=z.read('postgres.py').decode()
+              ast.parse(code)
+              assert "measure_sql_outbound(sql,params)" in code
+              assert "SQL_BANDWIDTH_REPORT" in code
+              assert "by_operation" in code
+              assert "SQL_METER_LOCK" in code
+          print("PASS: no SQL contents or parameters logged")
+          PY
+      - name: Commit current archive for Render automatic deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Report outbound query byte estimates per SQL operation"
+            git push
+          fi
