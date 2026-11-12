@@ -77,7 +77,8 @@ v=preview(forgive)
 assert v['count']==2 and v['total']==1000,v
 result=apply(forgive,v,'dddddddd-dddd-4ddd-dddd-dddddddddddd')
 assert result['total']==1000
-assert cash('p')==-60 and cash('q')==500
+assert cash('p')==0 and cash('q')==500
+assert result['cash_restored_total']==60
 assert db.execute("SELECT deposit,debt FROM bank_accounts WHERE player='p'").fetchone()[0]==150
 assert db.execute("SELECT debt FROM bank_accounts WHERE player='p'").fetchone()[0]==0
 assert db.execute("SELECT debt FROM bank_accounts WHERE player='q'").fetchone()[0]==0
