@@ -4,4 +4,6 @@ PASS: loan and overdraft relief, cash-only overdraft, positive cash protected, d
 DEBT_TEST_EXIT:0
 PASS: asset thresholds, percent/fixed, negative cash, idempotency, stale preview, deposits, legacy debt and profit ranking
 BULK_TEST_EXIT:0
+PASS: explicit extra 4-digit IDs, class mapping, registration, login, revoked/duplicate slot safety
+SLOTS_TEST_EXIT:0
 JS_EXIT:0
