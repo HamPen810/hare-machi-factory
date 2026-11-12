@@ -1,14 +1,5 @@
 PASS: debt cancellation and bulk operations added, original bank/market code preserved
 PATCH_STATUS:0
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 95, in <module>
-    v=preview(single)
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 43, in preview
-    return perform(admin,{**payload,'action':'preview'},now)
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 146, in perform
-    result=plan(db,postgres,payload)
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 126, in plan
-    raise ValueError('条件に合う操作対象者がいません。')
-ValueError: 条件に合う操作対象者がいません。
-TEST_STATUS:1
+PASS: asset thresholds, percent/fixed, negative cash, idempotency, stale preview, deposits, legacy debt and profit ranking
+TEST_STATUS:0
 JS_STATUS:0
