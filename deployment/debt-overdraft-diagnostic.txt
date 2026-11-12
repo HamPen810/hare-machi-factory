@@ -1,0 +1,15 @@
+PASS: forgive bank debt and reset negative cash to zero atomically, with audit and preview
+PATCH_EXIT:0
+Traceback (most recent call last):
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-debt-overdraft-clearing.py", line 50, in <module>
+    assert v['count']==1 and v['total']==300 and v['cash_restored_total']==500,v
+                                                 ~^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cash_restored_total'
+DEBT_TEST_EXIT:1
+Traceback (most recent call last):
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 80, in <module>
+    assert cash('p')==0 and cash('q')==500
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+BULK_TEST_EXIT:1
+JS_EXIT:0
