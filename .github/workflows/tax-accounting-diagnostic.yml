@@ -4,6 +4,7 @@ on:
     paths:
       - .github/workflows/tax-accounting-diagnostic.yml
       - deployment/exclude-tax-from-profit.py
+      - deployment/test-tax-accounting.py
   workflow_dispatch:
 permissions:
   contents: write
