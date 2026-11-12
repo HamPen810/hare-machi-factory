@@ -39,3 +39,5 @@ jobs:
           git add deployment/overdraft-diagnostic.txt
           git commit -m "Record admin collection deployment diagnostics"
           git push
+
+# Re-test CRLF-safe ledger initialization
