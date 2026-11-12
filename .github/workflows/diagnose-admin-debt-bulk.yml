@@ -36,3 +36,5 @@ jobs:
           git add deployment/debt-bulk-diagnostic.txt
           git commit -m "Record debt and bulk operations diagnostics"
           git push
+
+# Retry with ZIP module inclusion and stale-filter handling.
