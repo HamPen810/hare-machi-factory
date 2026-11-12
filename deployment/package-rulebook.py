@@ -6,6 +6,8 @@ archive=Path('hare-machi-render.zip')
 replacements={
  'static/rulebook-tabs.js':Path('deployment/rulebook-tabs.js').read_bytes(),
  'static/rulebook-tabs.css':Path('deployment/rulebook-tabs.css').read_bytes(),
+ 'static/rulebook-custom-tabs.js':Path('deployment/rulebook-custom-tabs.js').read_bytes(),
+ 'static/rulebook-custom-tabs.css':Path('deployment/rulebook-custom-tabs.css').read_bytes(),
 }
 with ZipFile(archive) as src:
     html=src.read('static/index.html').decode('utf-8')
@@ -13,6 +15,10 @@ with ZipFile(archive) as src:
         assert '</body>' in html and '</head>' in html
         html=html.replace('</head>','<link rel="stylesheet" href="/rulebook-tabs.css?v=1"></head>',1)
         html=html.replace('</body>','<script src="/rulebook-tabs.js?v=1" defer></script></body>',1)
+    if 'rulebook-custom-tabs.js' not in html:
+        assert '</body>' in html and '</head>' in html
+        html=html.replace('</head>','<link rel="stylesheet" href="/rulebook-custom-tabs.css?v=2"></head>',1)
+        html=html.replace('</body>','<script src="/rulebook-custom-tabs.js?v=2" defer></script></body>',1)
     replacements['static/index.html']=html.encode('utf-8')
     out=io.BytesIO()
     with ZipFile(out,'w') as dst:
@@ -30,4 +36,5 @@ with ZipFile(archive) as check:
     for name,content in replacements.items():
         assert check.read(name)==content
     assert check.read('static/index.html').count(b'rulebook-tabs.js')==1
+    assert check.read('static/index.html').count(b'rulebook-custom-tabs.js')==1
 print('Rulebook assets packaged safely')
