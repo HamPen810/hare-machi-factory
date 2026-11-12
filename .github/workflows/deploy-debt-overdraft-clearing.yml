@@ -1,0 +1,44 @@
+name: Deploy debt and negative-cash forgiveness repair
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-debt-overdraft-clearing.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch current production ZIP
+        run: python deployment/fix-debt-overdraft-clearing.py
+      - name: Extract current financial modules and check JavaScript
+        run: |
+          mkdir -p /tmp/clear-debt
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin_fund_ops.py','admin.py','accounts.py','exact.py',
+                           'bank.py','market.py','event.py','postgres.py'):
+                  Path('/tmp/clear-debt',name).write_bytes(z.read(name))
+              Path('/tmp/clear-debt-admin.js').write_bytes(z.read('static/admin.js'))
+              assert 'cash_restored_total' in z.read('admin_fund_ops.py').decode()
+              assert 'admin_overdraft_cancellations' in z.read('admin_fund_ops.py').decode()
+              assert 'マイナス所持金回復' in z.read('static/admin.js').decode()
+          PY
+          node --check /tmp/clear-debt-admin.js
+      - name: Regression test bank loan and negative cash forgiveness
+        run: |
+          PYTHONPATH=/tmp/clear-debt python deployment/test-debt-overdraft-clearing.py
+          PYTHONPATH=/tmp/clear-debt python deployment/test-admin-debt-bulk.py
+          PYTHONPATH=/tmp/clear-debt python deployment/test-extra-student-slots.py
+      - name: Publish tested ZIP and trigger Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Forgive bank loans and reset negative player cash to zero"; git push; }
