@@ -1,0 +1,10 @@
+AssertionError [ERR_ASSERTION]: No debt operation completion message
+    at main (/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-browser.cjs:80:2) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+TEST_EXIT_CODE:1
