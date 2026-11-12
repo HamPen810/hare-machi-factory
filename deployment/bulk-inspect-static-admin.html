@@ -1,0 +1,106 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>管理室 · 晴れ待ちファクトリー</title><style>
+*{box-sizing:border-box}body{margin:0;background:#edf3ec;color:#173f3d;font:14px/1.6 'Yu Gothic UI',Meiryo,sans-serif}main{max-width:1060px;margin:auto;padding:20px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}h1{font-size:24px;margin:0}h2{font-size:18px;margin:0 0 14px}small,.muted{color:#526e68}a{color:#167464}section{background:#fffaf0;border:1px solid #d2ddd1;border-radius:16px;padding:20px;margin-bottom:16px}button,input,select{font:inherit;border:1px solid #bdcec1;border-radius:8px;padding:10px;color:inherit;background:#fffdf5}button{cursor:pointer;min-height:44px}button.primary{background:#167464;color:white;border-color:#167464}label{display:grid;gap:5px}input{min-width:0;font-size:16px}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #c88b58;outline-offset:3px}[hidden]{display:none!important}#login{max-width:440px;margin:50px auto}#login form{display:grid;gap:14px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.stat{background:#fffaf0;border:1px solid #d2ddd1;border-radius:12px;padding:14px}.stat strong{display:block;font-size:24px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:15px}.tabs button[aria-selected=true]{background:#167464;color:white}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.table-wrap{overflow:auto;max-height:440px}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}th,td{padding:10px;border-bottom:1px solid #d2ddd1;text-align:left;white-space:nowrap}th{background:#edf3e7;position:sticky;top:0}td.name{white-space:normal;min-width:100px;overflow-wrap:anywhere}#notice{min-height:24px}#event{padding:10px 14px;background:#dcebe0;border-radius:10px}#account{display:flex;gap:8px;align-items:center}@media(max-width:600px){main{padding:12px}h1{font-size:19px}section{padding:14px}.stats{grid-template-columns:repeat(2,1fr);gap:8px}.stat strong{font-size:20px}.toolbar>*{max-width:100%}}
+.choice-tabs{display:flex;gap:5px;flex-wrap:wrap}.choice-tabs button{padding:8px 10px}.choice-tabs button[aria-selected=true]{background:#167464;color:white}@font-face{font-family:IslandHand;src:url('/fonts/Yomogi-Regular.ttf') format('truetype');font-display:swap}body,button,input,select,textarea{font-family:IslandHand,cursive}button:active{transform:translateY(1px)}button:disabled{opacity:.45}</style></head><body><main><header><div><small>晴れ待ちファクトリー</small><h1>工場長たちの管理室</h1></div><a href="/">ゲームへ</a></header>
+<section id="login"><h2>管理者ログイン</h2><p class="muted">お知らせ・参加者・ゲームの運用を管理します。</p><form id="login-form" method="post" action="/api/admin/login"><label>管理者パスワード<input id="password" type="password" required maxlength="128" autocomplete="current-password"></label><button class="primary" type="submit">管理室に入る</button></form></section>
+<div id="dashboard" hidden>
+<section aria-labelledby="operations-title"><h2 id="operations-title">ゲームの運用</h2>
+ <p id="maintenance-state" role="status"></p>
+ <div class="toolbar"><button id="pause-game">メンテナンス開始</button><button id="resume-game">ゲーム再開</button></div>
+ <form id="announcement-form"><label>全体へのお知らせ<textarea id="announcement" rows="3" maxlength="500"></textarea></label><div class="toolbar"><button type="submit" class="primary">配信</button></div></form>
+<details><summary>ルールブックを編集</summary>
+<form id="rulebook-form"><label>ルール本文<textarea id="rulebook-editor" rows="14" maxlength="12000"></textarea></label>
+<p>空欄で保存すると標準ルールに戻ります。</p>
+<button type="submit">ルールブックを保存</button></form></details>
+
+ <form id="player-form"><label>学籍番号<input id="target-student" required maxlength="4" inputmode="numeric" pattern="[0-9]{4}"></label>
+  <div class="toolbar"><button type="submit" value="freeze">凍結</button><button type="submit" value="unfreeze">凍結解除</button><button type="submit" value="reset">アカウントをリセット</button></div>
+  <p class="muted">リセットすると登録情報とゲーム進捗を削除します。同じ学籍番号で新規登録できます。</p>
+ </form>
+</section><div class="toolbar"><div id="event"></div><div id="account"><button id="refresh">更新する</button><button id="logout">ログアウト</button></div></div><small id="updated"></small><div id="stats" class="stats"></div>
+<nav class="tabs" role="tablist" aria-label="管理画面"><button role="tab" id="tab-players" data-panel="players" aria-controls="panel-players" aria-selected="true">参加者</button><button role="tab" id="tab-online" data-panel="online" aria-controls="panel-online" aria-selected="false">オンライン人数</button><button role="tab" id="tab-rankings" data-panel="rankings" aria-controls="panel-rankings" aria-selected="false">ランキング</button><button role="tab" id="tab-market" data-panel="market" aria-controls="panel-market" aria-selected="false">市場・出荷</button><button role="tab" id="tab-bank" data-panel="bank" aria-controls="panel-bank" aria-selected="false">銀行</button><button role="tab" id="tab-funds" data-panel="funds" aria-controls="panel-funds" aria-selected="false">資金調整</button></nav>
+<section id="panel-players" role="tabpanel" aria-labelledby="tab-players"><h2>参加者と工場</h2><div class="toolbar"><label>名前・学籍番号<input id="search" type="search" placeholder="検索"></label><label>クラス<select id="class"><option value="">全クラス</option><option value="1">1組</option><option value="2">2組</option><option value="3">3組</option><option value="4">4組</option><option value="5">5組</option><option value="6">6組</option><option value="7">7組</option><option value="8">8組</option></select></label></div><p id="count" class="muted"></p><div id="players-table" class="table-wrap"></div><p class="muted">製造数は完成品の累計。純利益は材料費・強化・解放・応援隊代を差し引いた値です。</p></section>
+<section id="panel-online" role="tabpanel" aria-labelledby="tab-online" hidden>
+<h2>オンライン人数の推移</h2>
+<p class="muted">直近2分以内にゲームと通信したアカウントを1人として集計。同じアカウントの複数操作は重複しません。</p>
+<div class="stats">
+<div class="stat"><span>現在のオンライン人数</span><strong id="online-count">—</strong></div>
+<div class="stat"><span>表示期間の最大人数</span><strong id="online-peak">—</strong></div>
+<div class="stat"><span>最後の計測</span><strong id="online-updated" style="font-size:16px">—</strong></div>
+</div>
+<div class="toolbar">
+<label>表示期間<select id="online-range"><option value="60">過去1時間</option><option value="360">過去6時間</option><option value="1440" selected>過去24時間</option></select></label>
+<button type="button" id="online-refresh">人数を更新</button>
+</div>
+<div id="online-graph" role="img" aria-label="オンライン人数の時系列グラフ" style="max-width:100%;overflow-x:auto"></div>
+<p id="online-description" class="muted" role="status" aria-live="polite">計測データを読み込みます。</p>
+<p class="muted">1分ごとに計測します。記録がない時間帯は0人とみなさず、グラフに空白として表示します。管理者画面を閉じていてもゲームが稼働している間は記録します。</p>
+</section>
+<section id="panel-rankings" role="tabpanel" aria-labelledby="tab-rankings" hidden><h2>大会のランキング</h2><div class="toolbar"><label>部門<select id="metric"><option value="manufactured">製造個数</option><option value="net_profit">純利益</option><option value="revenue">売上</option></select></label><label>対象<select id="scope"><option value="individual">個人</option><option value="classes">クラス</option></select></label></div><div id="rankings-table" class="table-wrap"></div></section>
+<section id="panel-market" role="tabpanel" aria-labelledby="tab-market" hidden><h2>受付中の出荷</h2><div id="pending-table" class="table-wrap"></div><h2 style="margin-top:22px">市場の精算実績</h2><div id="market-table" class="table-wrap"></div></section>
+<section id="panel-funds" role="tabpanel" aria-labelledby="tab-funds" hidden>
+<h2>個別アカウントへの資金調整</h2>
+<p class="muted">補助金は所持金だけに反映されます。徴収は支出・純利益に反映され、残高がマイナスになる場合も実行できます。</p>
+<form id="funds-form">
+<div class="toolbar">
+<label>対象プレイヤー（学籍番号4桁）<input id="funds-target" type="text" list="funds-options" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="例 2101"><datalist id="funds-options"></datalist></label>
+<label>操作<select id="funds-kind"><option value="grant">補助金を付与</option><option value="collect">資金を徴収</option></select></label>
+<label>金額（円）<input id="funds-amount" type="text" required placeholder="例 1e+10"></label>
+</div>
+<label>理由・メモ（任意、160文字以内）<input id="funds-note" type="text" maxlength="160" placeholder="例 イベント報酬・ルール違反"></label>
+<p id="funds-preview" class="muted"></p>
+<button id="funds-submit" class="primary" type="submit">確認画面へ</button>
+</form>
+<div id="funds-confirm" hidden>
+<p id="funds-confirm-message"></p>
+<div class="toolbar"><button type="button" class="primary" id="funds-apply">確定して実行</button><button type="button" id="funds-cancel">キャンセル</button></div>
+</div>
+<p id="funds-status" role="status" aria-live="polite"></p>
+<h3>最近の資金調整履歴</h3>
+<div id="funds-history" class="table-wrap"></div>
+</section>
+<section id="panel-bank" role="tabpanel" aria-labelledby="tab-bank" hidden>
+<h2>銀行・市場調整</h2>
+<form id="bank-config">
+<label><input name="enabled" type="checkbox"> 新規の貸し借りと売上税を有効にする</label>
+<div class="toolbar">
+<label>1時間の需要率（％）<input name="demand" type="text" required></label>
+<label>貸出利率（％）<input name="lend" type="text" required></label>
+<label>借入利率（％）<input name="borrow" type="text" required></label>
+<label>契約上限（円）<input name="limit" type="text" placeholder="例 1.25e+4" required></label>
+</div>
+<label>累進税率（1行に「売上の下限, 税率％」）<textarea name="brackets" rows="4" placeholder="0,0&#10;10000,5&#10;100000,10"></textarea></label>
+<p class="muted">各区分を超えた売上部分にその税率を適用します。空欄なら課税なし。</p>
+<fieldset><legend>指数課税</legend>
+<label><input name="use_exponential" type="checkbox"> 区分ごとに税率と区分の幅を2倍にする</label>
+<label>課税開始の累計売上（円）<input name="tax_start" value="1e+16"></label>
+<label>最初の課税区分の幅（円）<input name="tax_step" value="1e+16"></label>
+<label>最初の税率（％）<input name="tax_base" value="10"></label>
+
+<p class="muted">有効時は上の累進税率表の代わりに適用します。すでに稼いだ売上も税率の判定に使います。税率に上限はなく、税額が売上を超えると所持金が減ります。</p>
+</fieldset><button type="submit" disabled>銀行設定を保存</button>
+</form>
+<h3>総資産への指数課税</h3>
+<p>保存した指数課税の条件を、累計売上に代えて総資産へ適用します。総資産は所持金、満期受取額、工場・店頭在庫の定価評価額の合計です。実行するたびに、その時点の資産に対して一度課税します。</p>
+<button type="button" id="asset-tax-preview" disabled>課税額を試算</button>
+<div id="asset-tax-review" hidden>
+<p id="asset-tax-summary"></p>
+<button type="button" id="asset-tax-apply">現在の資産に課税する</button>
+</div>
+<h3>市場の買い取り・出品</h3>
+<p id="bank-offers"></p>
+<form id="bank-market">
+<label>商品<select id="bank-market-product" name="product"><option value="white">てるてる坊主</option><option value="sea">海坊主</option><option value="shisa">シーサー坊主</option></select></label>
+<label>数量<input name="quantity" type="text" placeholder="例 1.25e+4" required></label>
+<label>銀行の出品単価（円）<input name="price" type="text" value="100"></label>
+<button type="submit" name="kind" value="buyout" disabled>安い出品から買い取る</button>
+<button type="submit" name="kind" value="offer" disabled>銀行の出品を設定</button>
+<p class="muted">買い取りは確認後に即時成立します。出品は指定個数で置き換わり、購入または市場の精算で売れます。0個で取り下げます。</p>
+</form>
+<div id="bank-market-confirm" hidden>
+<p id="bank-market-confirm-text"></p>
+<button type="button" id="bank-market-apply">実行する</button>
+<button type="button" id="bank-market-cancel">キャンセル</button>
+</div>
+<p id="admin-bank-status" role="status"></p>
+</section>
+</div><p id="notice" role="status" aria-live="polite"></p><footer class="muted">管理者専用 · 集計データは「更新する」で読み込みます</footer></main><script src="/numbers.js" defer></script><script src="/tabs.js" defer></script><script src="/admin.js" defer></script></body></html>
