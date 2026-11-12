@@ -38,3 +38,5 @@ jobs:
           git push
 
 # Retry with ZIP module inclusion and stale-filter handling.
+
+# Retry with legacy debt fixture that creates the bank account row.
