@@ -2,11 +2,12 @@ BOOTSTRAP PASSED
 EXTRA_SLOT_ADD PASSED {'student_id': '2999', 'operation': 'add', 'class_number': 3}
 EXTRA_SLOT_LIST PASSED
 REGISTER_LOGIN PASSED
+DEBUG_STUDENT '2999' <class 'str'> 4 True True
+DEBUG_VALIDATE_SOURCE /home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py
 Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-postgres.py", line 61, in <module>
-    preview=perform(admin,{**payload,'action':'preview'},1794480000000)
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 144, in perform
-    payload=validate(data)
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-postgres.py", line 64, in <module>
+    print('DEBUG_VALIDATE',admin_fund_ops.validate(payload),flush=True)
+                           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
   File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 49, in validate
     raise ValueError('正しい学籍番号4桁を入力してください。')
 ValueError: 正しい学籍番号4桁を入力してください。
