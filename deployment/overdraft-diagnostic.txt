@@ -1,25 +1,6 @@
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/allow-overdraft-admin-collections.py", line 45, in <module>
-    substitute('admin.py',
-    ~~~~~~~~~~^^^^^^^^^^^^
-    """            self.db.execute('CREATE TABLE IF NOT EXISTS site_rulebook(id INTEGER PRIMARY KEY, body TEXT NOT NULL)')
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ...<8 lines>...
-                    note TEXT NOT NULL, created_at BIGINT NOT NULL)\"\"\")
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    """)
-    ^^^^
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/allow-overdraft-admin-collections.py", line 17, in substitute
-    if n!=1:raise RuntimeError(f'Unexpected {filename} layout: {n} occurrences of {before[:85]!r}')
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-RuntimeError: Unexpected admin.py layout: 0 occurrences of "            self.db.execute('CREATE TABLE IF NOT EXISTS site_rulebook(id INTEGER PRIM"
-PATCH_STATUS:1
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-overdraft-admin-collections.py", line 40, in <module>
-    collect=admin.fund_transfer('2101','collect','4e+200','collect','bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',1794480000001)
-  File "/tmp/admin-overdraft-diag/admin.py", line 152, in fund_transfer
-    raise ValueError('所持金が徴収額に足りません。')
-ValueError: 所持金が徴収額に足りません。
-TEST_STATUS:1
+PASS: admin collections debit below zero; historical collections included in expense and net profit; grants excluded
+PATCH_STATUS:0
+PASS: negative cash, exact giant collection, audit replay, grant excluded, collection expense + net profit including past history
+TEST_STATUS:0
 ADMIN_JS_STATUS:0
 APP_JS_STATUS:0
