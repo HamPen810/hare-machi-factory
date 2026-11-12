@@ -1,0 +1,30 @@
+name: Deploy categorized rulebook
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-rulebook-tabs.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Validate JavaScript
+        run: node --check deployment/rulebook-tabs.js
+      - name: Update only rulebook UI assets in ZIP
+        run: python deployment/package-rulebook.py
+      - name: Commit game archive (Render auto-deploy)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Deploy categorized rulebook tabs in game archive"
+            git push
+          fi
