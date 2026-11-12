@@ -1,0 +1,69 @@
+name: Repair administrator debt forgiveness and registration slots
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-admin-repair.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d testdb"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair current production archive
+        run: python deployment/repair-admin-debt-slots.py
+      - name: Install isolated test dependencies
+        run: |
+          pip install 'psycopg[binary]' psycopg-pool
+          npm install --no-save jsdom@26
+      - name: Verify actual PostgreSQL account and loan operations
+        run: |
+          mkdir -p /tmp/admin-repair-pg
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for n in ('accounts.py','admin.py','admin_fund_ops.py','bank.py',
+                        'market.py','postgres.py','exact.py','event.py'):
+                  Path('/tmp/admin-repair-pg',n).write_bytes(z.read(n))
+          PY
+          PG_TEST_DSN=postgresql://tester:tester@127.0.0.1:5432/testdb             PYTHONPATH=/tmp/admin-repair-pg python deployment/test-admin-repair-postgres.py
+      - name: Verify real administrator DOM form submissions
+        run: |
+          mkdir -p /tmp/admin-repair-browser
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for n in ('static/admin.html','static/admin.js'):
+                  Path('/tmp/admin-repair-browser',n.split('/')[-1]).write_bytes(z.read(n))
+              assert 'id="extra-slots-section" open' in z.read('static/admin.html').decode()
+              assert "this account" not in z.read('admin_fund_ops.py').decode()
+          PY
+          ADMIN_REPAIR_ASSETS=/tmp/admin-repair-browser node deployment/test-admin-repair-browser.cjs
+          node --check /tmp/admin-repair-browser/admin.js
+      - name: Ensure previous feature tests are still green
+        run: |
+          PYTHONPATH=/tmp/admin-repair-pg python deployment/test-admin-debt-bulk.py
+          PYTHONPATH=/tmp/admin-repair-pg python deployment/test-admin-online-chart.py
+      - name: Deploy only tested production ZIP to existing Render services
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Repair administrator debt confirmation and visible registration slots"; git push; }
