@@ -58,3 +58,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/fast-debt-diagnostic.txt
           git diff --cached --quiet || { git commit -m "Record fast debt forgiveness regression diagnostics"; git push; }
+
+# Revalidate with PostgreSQL NUMERIC comparison and live-balance semantics.
