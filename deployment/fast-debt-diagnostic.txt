@@ -2,11 +2,8 @@ PASS: targeted forgiveness with no global advisory or all-player row lock; estim
 PATCH:0
 PASS live stale estimate, fresh bank debt, overdraft-only, positive cash, no-op, idempotency, batch latest balances
 LIVE_BALANCE:0
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-debt-overdraft-clearing.py", line 112, in <module>
-    raise AssertionError('stale forgiveness applied')
-AssertionError: stale forgiveness applied
-OLD_DEBT:1
+PASS: loans, cash-only overdraft, positive cash preserved, deposits, bulk, audit, idempotence, changed preview accepted
+OLD_DEBT:0
 PASS: asset thresholds, percent/fixed, negative cash, idempotency, stale preview, deposits, legacy debt and profit ranking
 BULK:0
 PASS: explicit extra 4-digit IDs, class mapping, registration, login, revoked/duplicate slot safety
@@ -20,31 +17,8 @@ DEBUG_STUDENT '2999' <class 'str'> 4 True True
 DEBUG_VALIDATE_SOURCE /tmp/fast-debt-diag/admin_fund_ops.py
 DEBUG_VALIDATE {'scope': 'single', 'kind': 'forgive', 'note': 'check', 'student_id': '2999'}
 DEBT_PREVIEW PASSED
-Traceback (most recent call last):
-  File "/tmp/fast-debt-diag/postgres.py", line 139, in execute
-    return self.connection.execute(sql, params)
-           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
-  File "/home/runner/.local/lib/python3.14/site-packages/psycopg/connection.py", line 304, in execute
-    raise ex.with_traceback(None)
-psycopg.errors.UndefinedFunction: function bge(integer, numeric) does not exist
-LINE 1: UPDATE factories SET cash=0 WHERE player=$1 AND bge(0,cash)
-                                                        ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-postgres.py", line 71, in <module>
-    result=perform(admin,{**payload,'action':'apply','key':'abcd1234abcd1234abcd1234',
-            'preview_digest':preview['digest']},1794480000000)
-  File "/tmp/fast-debt-diag/admin_fund_ops.py", line 157, in perform
-    return execute(admin,payload,data,now)
-  File "/tmp/fast-debt-diag/admin_forgive_fast.py", line 144, in execute
-    db.execute('UPDATE factories SET cash=0 '
-    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-               'WHERE player=? AND bge(0,cash)',(player,))
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/tmp/fast-debt-diag/postgres.py", line 143, in execute
-    raise sqlite3.OperationalError('PostgreSQL query failed') from error
-sqlite3.OperationalError: PostgreSQL query failed
-POSTGRESQL:1
+DEBT_APPLY PASSED
+CHANGED_BALANCE_CLEARED PASSED
+UNRELATED_PLAYER_LOCK_NO_LONGER_BLOCKS PASSED
+PASS: production PostgreSQL wrapper supports registration ID and debt operations
+POSTGRESQL:0
