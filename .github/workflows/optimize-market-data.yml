@@ -1,0 +1,41 @@
+name: Optimize and verify market data paging
+on:
+  push:
+    paths:
+      - .github/workflows/optimize-market-data.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch current deployed ZIP only
+        run: python deployment/optimize-data-timeline.py
+      - name: Test timeline precision, completeness and safe client script
+        run: |
+          mkdir -p /tmp/market-timeline-test
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as zipfile:
+              for path in ('market.py','bank.py','accounts.py','event.py','exact.py'):
+                  Path('/tmp/market-timeline-test',path).write_bytes(zipfile.read(path))
+              Path('/tmp/paged-app.js').write_bytes(zipfile.read('static/app.js'))
+          PY
+          PYTHONPATH=/tmp/market-timeline-test python deployment/test-paged-timeline.py
+          node --check /tmp/paged-app.js
+      - name: Deploy existing service by committing ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "Archive already current"
+          else
+            git commit -m "Page market timeline and fetch incremental chart updates"
+            git push
+          fi
