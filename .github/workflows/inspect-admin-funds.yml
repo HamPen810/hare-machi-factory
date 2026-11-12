@@ -1,0 +1,28 @@
+name: Inspect deployed admin funds controls
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-admin-funds.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract current production admin and account sources
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.py','accounts.py','server.py','static/admin.js','static/admin.html','exact.py'):
+                  Path('deployment/funds-inspect-'+name.replace('/','-')).write_bytes(z.read(name))
+          PY
+      - name: Commit snapshots for targeted patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/funds-inspect-*
+          git diff --cached --quiet || { git commit -m "Inspect current admin funds APIs and UI"; git push; }
