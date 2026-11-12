@@ -24,6 +24,9 @@ try:
                         salt bytea NOT NULL,password_hash bytea NOT NULL,created_at BIGINT NOT NULL)''')
         conn.execute('''CREATE TABLE factories(player text PRIMARY KEY REFERENCES players(id),
                         cash NUMERIC NOT NULL)''')
+        conn.execute('CREATE TABLE frozen_players(player_id text PRIMARY KEY REFERENCES players(id))')
+        conn.execute('CREATE TABLE auth_attempts(student_id text PRIMARY KEY, failures INTEGER NOT NULL DEFAULT 0, blocked_until BIGINT NOT NULL DEFAULT 0)')
+        conn.execute('CREATE TABLE sessions(token_hash text PRIMARY KEY,player_id text REFERENCES players(id),expires_at BIGINT)')
         conn.execute('CREATE TABLE stock(player text,product text,quantity NUMERIC)')
         conn.execute('CREATE TABLE listings(player text,product text,quantity NUMERIC)')
     acct=Accounts(dsn,read_only=True,admin_only=True)
