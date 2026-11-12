@@ -167,7 +167,12 @@ def perform(admin,data,now):
         # order (and serialize normal bank/game action writers).
         if postgres:
             db.execute('SELECT id FROM players ORDER BY id FOR NO KEY UPDATE').fetchall()
-        snapshot=plan(db,postgres,payload)
+        try:
+            snapshot=plan(db,postgres,payload)
+        except ValueError as error:
+            if '条件に合う操作対象者がいません' in str(error):
+                raise ValueError('確認後に対象者が変わりました。もう一度試算してください。') from error
+            raise
         if snapshot['digest']!=digest:
             raise ValueError('確認後に資産や対象者が変わりました。もう一度試算してください。')
         if payload['kind']=='forgive':
