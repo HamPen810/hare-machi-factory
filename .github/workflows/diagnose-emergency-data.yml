@@ -1,0 +1,66 @@
+name: Diagnose market history optimization
+on:
+  push:
+    paths:
+      - .github/workflows/diagnose-emergency-data.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d testdb"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record patch and tests without production changes
+        run: |
+          set +e
+          {
+            python deployment/emergency-reduce-game-data-load.py
+            echo "PATCH_STATUS:$?"
+            mkdir -p /tmp/hare-history
+            python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for n in ('market.py','accounts.py','bank.py','exact.py','event.py','admin.py','postgres.py','admin_fund_ops.py','admin_forgive_fast.py'):
+                  Path('/tmp/hare-history',n).write_bytes(z.read(n))
+              assert 'start=max(0,end-59)' in z.read('market.py').decode()
+          PY
+            python -m py_compile /tmp/hare-history/market.py
+            echo "COMPILE_STATUS:$?"
+            PRODUCTION_MODULE_DIR=/tmp/hare-history python deployment/test-fast-debt-forgiveness.py
+            echo "DEBT_STATUS:$?"
+            PRODUCTION_MODULE_DIR=/tmp/hare-history python deployment/test-extra-student-slots.py
+            echo "SLOTS_STATUS:$?"
+            pip -q install 'psycopg[binary]'
+            python - <<'PY'
+          import psycopg
+          with psycopg.connect('postgresql://tester:tester@127.0.0.1:5432/testdb',autocommit=True) as c:
+              c.execute('CREATE TABLE actions(player TEXT,payload TEXT,result TEXT)')
+              c.execute('INSERT INTO actions VALUES(%s,%s,%s)',('p','["upgrade",1]','{"spent":123}'))
+              c.execute('INSERT INTO actions VALUES(%s,%s,%s)',('p','["upgrade",2]','{"spent":77}'))
+              q="SELECT payload::jsonb->>0 AS kind, SUM(COALESCE((result::jsonb->>'spent')::numeric,0)) AS spent FROM actions WHERE player=%s GROUP BY payload::jsonb->>0"
+              got=dict(c.execute(q,('p',)).fetchall())
+              assert got=={'upgrade':200},got
+              print('POSTGRESQL PASS',got)
+          PY
+            echo "POSTGRESQL_STATUS:$?"
+          } >deployment/emergency-data-diagnostic.txt 2>&1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/emergency-data-diagnostic.txt
+          git diff --cached --quiet || { git commit -m "Record emergency market data optimization diagnostics"; git push; }
