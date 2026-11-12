@@ -1,0 +1,179 @@
+(()=>{const $=s=>document.querySelector(s),{fmt,parseWhole}=window.TeruNumber,names={white:'てるてる坊主',sea:'海坊主',shisa:'シーサー坊主'};let data=null,busy=false,version=0;
+function notice(t){$('#notice').textContent=t;}
+async function api(path,body){const r=await fetch('/api/admin/'+path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});const d=await r.json();if(!r.ok){if(r.status===401){data=null;$('#dashboard').hidden=true;$('#login').hidden=false;}throw Error(d.error||'通信できませんでした。');}return d;}
+function table(target,headers,rows){const parent=$(target);parent.replaceChildren();if(!rows.length){parent.textContent='該当するデータはありません。';return;}const t=document.createElement('table'),head=document.createElement('thead'),tr=document.createElement('tr');for(const text of headers){const th=document.createElement('th');th.scope='col';th.textContent=text;tr.append(th);}head.append(tr);t.append(head);const body=document.createElement('tbody');for(const row of rows){const tr=document.createElement('tr');for(const text of row){const td=document.createElement('td');td.className='name';td.textContent=text;tr.append(td);}body.append(tr);}t.append(body);parent.append(t);}
+function render(){const s=data.summary;$('#event').textContent=(data.event.practice?'練習データ · ':'大会データ · ')+{before:'開催前',open:'開催中',closed:'終了'}[data.event.phase]+' · 締切 11/19 20:00';$('#updated').textContent='最終更新 '+new Date(data.now).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+'（日本時間）';$('#stats').replaceChildren();for(const [label,value]of [['参加者',fmt(s.players)+'人'],['累計製造',fmt(s.manufactured)+'個'],['累計売上',fmt(s.revenue)+'円'],['累計純利益',fmt(s.net_profit)+'円'],['受付中の出荷',fmt(s.pending_shipments)+'件'],['精算済み',fmt(s.settled_rounds)+'回']]){const card=document.createElement('div');card.className='stat';const small=document.createElement('span'),large=document.createElement('strong');small.textContent=label;large.textContent=value;card.append(small,large);$('#stats').append(card);}renderPlayers();renderRanks();table('#pending-table',['学籍番号','名前','商品','数量','価格'],data.pending.map(r=>[r.student_id,r.display_name,names[r.product],fmt(r.quantity)+'個',fmt(r.price)+'円']));table('#market-table',['精算回の終了時刻','商品','流通量','販売数','平均価格','店舗数'],data.market.map(r=>[new Date((r.round+1)*60000).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}),names[r.product],fmt(r.offered),fmt(r.sold),r.average_price===null?'販売なし':fmt(Number(Number(r.average_price).toFixed(2)))+'円',r.sellers]));}
+function renderPlayers(){if(!data)return;const query=$('#search').value.trim(),cls=$('#class').value,rows=data.players.filter(p=>(!cls||String(p.class_number)===cls)&&(!query||p.student_id.includes(query)||p.display_name.includes(query)));$('#count').textContent=rows.length+'人 / 全'+data.players.length+'人';table('#players-table',['学籍番号','名前','所持金','製造数','純利益','売上','強化段階','倉庫在庫'],rows.map(p=>[p.student_id,p.display_name,fmt(p.cash)+'円',fmt(p.manufactured)+'個',fmt(p.net_profit)+'円',fmt(p.revenue)+'円',p.tier,p.stock.map(s=>names[s.product]+' '+fmt(s.quantity)+'個').join(' / ')||'なし']));}
+function renderRanks(){if(!data)return;const m=$('#metric').value,scope=$('#scope').value;table('#rankings-table',['順位',scope==='individual'?'名前':'クラス',$('#metric').selectedOptions[0].textContent],data.rankings[m][scope].map(r=>[r.rank+'位',scope==='individual'?r.display_name:r.class_number+'組',fmt(r[m])+(m==='manufactured'?'個':'円')]));}
+async function refresh(silent=false){if(busy)return;busy=true;const v=version;try{const next=await api('dashboard');if(v!==version)return;data=next;$('#login').hidden=true;$('#dashboard').hidden=false;render();notice('');}catch(e){if(!silent)notice(e.message);}finally{busy=false;}}
+function renderSettings(settings){
+ $('#maintenance-state').textContent=settings.maintenance?'サーバーメンテナンス中':'ゲーム稼働中';
+ $('#pause-game').disabled=settings.maintenance;
+ $('#resume-game').disabled=!settings.maintenance;
+ if (settings.default_rulebook !== undefined || settings.rulebook) {
+  $('#rulebook-editor').value=settings.rulebook || settings.default_rulebook;
+ }
+}
+async function openControls(){
+ const settings=await api('settings');
+ $('#login').hidden=true;
+ $('#dashboard').hidden=false;
+ renderSettings(settings);
+}
+async function updateSetting(button,field,value){
+ button.disabled=true;
+ try{
+  renderSettings(await api('settings',{field,value}));
+  notice('設定を反映しました。');
+ }catch(error){
+  button.disabled=false;
+  notice(error.message);
+ }finally{
+  if(field==='announcement'||field==='rulebook')button.disabled=false;
+ }
+}
+$('#pause-game').onclick=event=>updateSetting(event.currentTarget,'maintenance',true);
+$('#resume-game').onclick=event=>updateSetting(event.currentTarget,'maintenance',false);
+$('#rulebook-form').onsubmit=event=>{
+ event.preventDefault();
+ void updateSetting(event.submitter,'rulebook',$('#rulebook-editor').value);
+};
+$('#announcement-form').onsubmit=event=>{
+ event.preventDefault();
+ void updateSetting(event.submitter,'announcement',$('#announcement').value);
+};
+$('#player-form').onsubmit=async event=>{
+ event.preventDefault();
+ const button=event.submitter,operation=button.value,student_id=$('#target-student').value;
+ if(operation==='reset'&&!window.confirm(student_id+' の登録情報とゲーム進捗を削除します。続けますか？'))return;
+ button.disabled=true;
+ try{
+  const result=await api('player',{student_id,operation});
+  notice(result.display_name+' の'+{freeze:'凍結',unfreeze:'凍結解除',reset:'リセット'}[operation]+'を反映しました。');
+ }catch(error){notice(error.message);}
+ finally{button.disabled=false;}
+};
+$('#login-form').onsubmit=async event=>{
+ event.preventDefault();
+ const button=event.submitter;
+ button.disabled=true;
+ try{
+  await api('login',{password:$('#password').value});
+  $('#password').value='';
+  version++;
+  await openControls();
+  notice('');
+ }catch(error){notice(error.message);}
+ finally{button.disabled=false;}
+};
+$('#logout').onclick=async()=>{try{await api('logout',{});version++;data=null;$('#dashboard').hidden=true;$('#login').hidden=false;$('#stats').replaceChildren();for(const s of ['#players-table','#rankings-table','#pending-table','#market-table'])$(s).replaceChildren();notice('ログアウトしました。');}catch(e){notice(e.message);}};
+$('#refresh').onclick=()=>refresh();$('#search').oninput=renderPlayers;$('#class').onchange=renderPlayers;$('#metric').onchange=renderRanks;$('#scope').onchange=renderRanks;
+const bankConfig = $('#bank-config');
+const bankMarket = $('#bank-market');
+const bankStatus = $('#admin-bank-status');
+const bankControls = [...$('#panel-bank').querySelectorAll('button')];
+let bankWorking = false;
+let bankPending;
+async function loadBankAdmin() {
+ const {settings,offers} = await api('bank');
+ const f = bankConfig.elements;
+ f.enabled.checked = settings.enabled;
+ f.demand.value = settings.demand_bps / 100;
+ f.lend.value = settings.lend_bps / 100;
+ f.borrow.value = settings.borrow_bps / 100;
+ f.limit.value = settings.limit;
+ const exp = settings.exponential;
+ f.use_exponential.checked = Boolean(exp);
+ if (exp) {
+  f.tax_start.value = exp.threshold;
+  f.tax_step.value = exp.step;
+  f.tax_base.value = exp.base_bps / 100;
+ }
+ f.brackets.value = settings.brackets.map(([threshold,rate])=>threshold+','+rate/100).join('\n');
+ $('#bank-offers').textContent = offers.map(r=>names[r.product]+' '+fmt(r.quantity)+'個 × '+fmt(r.price)+'円').join(' ／ ') || '銀行の出品はありません。';
+}
+async function bankAdminRequest(payload) {
+ if (bankWorking) return;
+ const signature = JSON.stringify(payload);
+ if (!bankPending || bankPending.signature !== signature) bankPending = {signature,key:crypto.randomUUID()};
+ bankWorking = true;
+ bankControls.forEach(b=>b.disabled=true);
+ try {
+  const result = await api('bank', {...payload,key:bankPending.key});
+  bankPending = null;
+  if (result.asset_tax !== undefined) {
+   const summary=fmt(result.players)+'人 · 合計 '+fmt(result.asset_tax)+'円';
+   $('#asset-tax-review').hidden=result.applied;
+   $('#asset-tax-summary').textContent='試算 '+summary+'。実行時に再計算します。';
+   bankStatus.textContent=result.applied ? '総資産への課税を実行しました。'+summary : '';
+   return;
+  }
+  $('#asset-tax-review').hidden=true;
+  bankStatus.textContent = result.spent !== undefined ? '買い取り完了 · 売上総額 '+fmt(result.spent)+'円' : payload.kind==='offer' ? (BigInt(result.quantity)===0n ? '銀行の出品を取り下げました。' : '出品しました。市場に '+fmt(result.quantity)+'個を掲載中です。') : '保存しました。';
+  await loadBankAdmin();
+ } catch(error) { bankStatus.textContent = error.message; }
+ finally { bankWorking=false; bankControls.forEach(b=>b.disabled=false); }
+}
+function basisPoints(value) {
+ const points = parseWhole(value,2);
+ if (points === null || points > 10000n) throw Error('率は0〜100％の範囲で小数第2位まで指定してください。');
+ return Number(points);
+}
+function bankInteger(value) {
+ const result = parseWhole(value);
+ if (result === null) throw Error('整数になる数値を入力してください（例 1.25e+4）。');
+ return result.toString();
+}
+$('#tab-bank').addEventListener('click', async () => {
+ bankControls.forEach(b=>b.disabled=true);
+ try { await loadBankAdmin(); bankControls.forEach(b=>b.disabled=false); }
+ catch(error) { bankStatus.textContent=error.message; }
+});
+bankConfig.onsubmit = event => {
+ event.preventDefault();
+ const f = bankConfig.elements;
+ try {
+  const brackets = f.brackets.value.split(/\r?\n/).filter(line=>line.trim()).map(line=>{
+   const parts = line.split(',').map(part=>part.trim());
+   if (parts.length!==2) throw Error('税率の行は「売上の下限, 税率％」で入力してください。');
+   return [bankInteger(parts[0]),basisPoints(parts[1])];
+  });
+  const exponential = f.use_exponential.checked ? {
+   threshold:bankInteger(f.tax_start.value),step:bankInteger(f.tax_step.value),
+   base_bps:basisPoints(f.tax_base.value)
+  } : null;
+  void bankAdminRequest({kind:'configure',enabled:f.enabled.checked,limit:bankInteger(f.limit.value),exponential,
+   demand_bps:basisPoints(f.demand.value),lend_bps:basisPoints(f.lend.value),borrow_bps:basisPoints(f.borrow.value),brackets});
+ } catch(error) { bankStatus.textContent=error.message; }
+};
+$('#asset-tax-preview').onclick=()=>bankAdminRequest({kind:'asset_tax_preview'});
+$('#asset-tax-apply').onclick=()=>bankAdminRequest({kind:'asset_tax_apply'});
+const marketConfirm = $('#bank-market-confirm');
+let marketOrder;
+bankMarket.onsubmit = event => {
+ event.preventDefault();
+ const kind = event.submitter?.value;
+ if (!kind || bankWorking) return;
+ const f = bankMarket.elements;
+ try {
+  const quantity = bankInteger(f.quantity.value);
+  const price = kind==='offer' && BigInt(quantity)>0n ? bankInteger(f.price.value) : '1';
+  marketOrder = {kind,product:$('#bank-market-product').value,quantity,price};
+  $('#bank-market-confirm-text').textContent = names[marketOrder.product]+' '+fmt(quantity)+'個'
+   +(kind==='buyout' ? 'を安い出品から買い取ります。' : BigInt(quantity)===0n ? '。銀行の出品を取り下げます。' : 'を単価 '+fmt(price)+'円で出品します。');
+  marketConfirm.hidden = false;
+  $('#bank-market-apply').focus();
+ } catch(error) { bankStatus.textContent=error.message; }
+};
+$('#bank-market-apply').onclick = () => {
+ if (!marketOrder || bankWorking) return;
+ marketConfirm.hidden=true;
+ void bankAdminRequest(marketOrder);
+};
+$('#bank-market-cancel').onclick = () => {
+ marketOrder=null;
+ marketConfirm.hidden=true;
+};
+for(const b of document.querySelectorAll('[data-panel]'))b.onclick=()=>{for(const t of document.querySelectorAll('[data-panel]')){const active=t===b;t.setAttribute('aria-selected',String(active));$('#panel-'+t.dataset.panel).hidden=!active;}};
+openControls().catch(()=>{});
+})();
