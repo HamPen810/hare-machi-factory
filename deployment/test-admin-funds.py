@@ -11,6 +11,7 @@ db.execute('CREATE TABLE players (id TEXT PRIMARY KEY,student_id TEXT UNIQUE,dis
 db.execute('CREATE TABLE factories (player TEXT PRIMARY KEY,cash NUMERIC)')
 db.execute("INSERT INTO players VALUES('p','2101','Test Student')")
 db.execute("INSERT INTO factories VALUES('p',?)",(10**320,))
+db.commit()
 admin=Admin(SimpleNamespace(db=db,postgres=False))
 cash=lambda:db.execute("SELECT cash FROM factories WHERE player='p'").fetchone()[0]
 initial=cash()
