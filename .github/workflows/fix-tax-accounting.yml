@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/workflows/fix-tax-accounting.yml
+      - deployment/test-tax-accounting.py
   workflow_dispatch:
 
 permissions:
