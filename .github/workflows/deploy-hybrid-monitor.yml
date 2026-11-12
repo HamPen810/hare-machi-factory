@@ -1,0 +1,39 @@
+name: Deploy Hybrid Backend Admin Monitor
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-hybrid-monitor.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch current production ZIP with admin hybrid monitor
+        run: python deployment/hybrid/add-monitor-ui.py
+      - name: Check monitoring page and unchanged core
+        run: |
+          mkdir -p /tmp/hybrid-monitor
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              h=z.read('static/admin.html').decode()
+              j=z.read('static/admin.js').decode()
+              assert 'id="tab-hybrid"' in h and 'id="hybrid-metrics"' in h
+              assert "api('hybrid')" in j
+              assert "if not cluster or role == 'A':" in z.read('server.py').decode()
+              for name in ('hybrid_router.py','hybrid_worker.py','oracle_deploy_agent.py'):
+                  Path('/tmp/hybrid-monitor',name).write_bytes(z.read(name))
+              Path('/tmp/hybrid-monitor-admin.js').write_text(j)
+          PY
+          node --check /tmp/hybrid-monitor-admin.js
+          PYTHONPATH=/tmp/hybrid-monitor python deployment/hybrid/test_hybrid.py
+      - name: Commit verified ZIP for automatic Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Display hybrid backend metrics in admin dashboard"; git push; }
