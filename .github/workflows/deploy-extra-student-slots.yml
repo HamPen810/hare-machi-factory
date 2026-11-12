@@ -1,0 +1,43 @@
+name: Deploy admin-defined student registration slots
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-extra-student-slots.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Update current production ZIP without modifying unrelated game logic
+        run: python deployment/add-extra-student-slots.py
+      - name: Test new account slots, auth, banking and administrator UI
+        run: |
+          mkdir -p /tmp/extra-slot-test
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('accounts.py','admin.py','admin_fund_ops.py','exact.py','bank.py','market.py','event.py'):
+                  Path('/tmp/extra-slot-test',name).write_bytes(z.read(name))
+              Path('/tmp/extra-slot-admin.js').write_bytes(z.read('static/admin.js'))
+              html=z.read('static/admin.html').decode('utf-8')
+              srv=z.read('server.py').decode('utf-8')
+              assert 'id="extra-slot-form"' in html
+              assert 'id="extra-slot-list"' in html
+              assert "self.path=='/api/admin/slots'" in srv
+          PY
+          PYTHONPATH=/tmp/extra-slot-test python deployment/test-extra-student-slots.py
+          PYTHONPATH=/tmp/extra-slot-test python deployment/test-admin-debt-bulk.py
+          PYTHONPATH=/tmp/extra-slot-test python deployment/test-admin-online-chart.py
+          node --check /tmp/extra-slot-admin.js
+      - name: Commit tested ZIP for auto-deploy on Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Allow administrator to add and revoke extra account registration slots"; git push; }
