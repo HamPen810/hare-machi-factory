@@ -1,0 +1,39 @@
+name: Safeguard Supabase session pool for hybrid rollouts
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-hybrid-db-pool.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch current ZIP without changing game state
+        run: python deployment/hybrid/reduce-session-pool.py
+      - name: Validate pool sizing and existing hybrid tests
+        run: |
+          mkdir -p /tmp/hybrid-pool-test
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          with ZipFile('hare-machi-render.zip') as z:
+              p=z.read('postgres.py').decode()
+              assert 'max_size=_safe_pool_limit()' in p
+              assert 'HARE_FACTORY_MAIN_PG_POOL' in p
+              assert 'return max(1,min(6,value))' in p
+              ast.parse(p)
+              for name in ('hybrid_router.py','hybrid_worker.py','accounts.py','bank.py','exact.py'):
+                  Path('/tmp/hybrid-pool-test',name).write_bytes(z.read(name))
+          PY
+          PYTHONPATH=/tmp/hybrid-pool-test python deployment/hybrid/test_hybrid.py
+          python -m compileall -q /tmp/hybrid-pool-test
+      - name: Commit tested archive and trigger existing Render auto deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Limit Supabase session connections for safe hybrid rolling deploys"; git push; }
