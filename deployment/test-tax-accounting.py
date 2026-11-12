@@ -30,7 +30,7 @@ assert rank()==(73,73),rank()
 
 game=object.__new__(market.Game)
 game.db=db
-game.accounts=type('Identity',(),{'identity':lambda self,token,now:{'id':'p'}})()
+game.accounts=type('Identity',(),{'postgres':False,'identity':lambda self,token,now:{'id':'p'}})()
 game.clock=lambda:0
 result=game.breakdown('test-token')
 assert sum(x['amount'] for x in result['income'])==100,result
