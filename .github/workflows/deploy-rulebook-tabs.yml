@@ -14,7 +14,9 @@ jobs:
         with:
           persist-credentials: true
       - name: Validate JavaScript
-        run: node --check deployment/rulebook-tabs.js
+        run: |
+          node --check deployment/rulebook-tabs.js
+          node --check deployment/rulebook-custom-tabs.js
       - name: Update only rulebook UI assets in ZIP
         run: python deployment/package-rulebook.py
       - name: Commit game archive (Render auto-deploy)
