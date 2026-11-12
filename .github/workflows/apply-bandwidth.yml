@@ -1,0 +1,56 @@
+name: Apply bandwidth optimization to deployed ZIP
+on:
+  push:
+    paths:
+      - .github/workflows/apply-bandwidth.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch only server.py inside the deployment archive
+        run: |
+          python - <<'PY'
+          import pathlib, zipfile
+          archive = pathlib.Path('hare-machi-render.zip')
+          with zipfile.ZipFile(archive) as z:
+              existing = z.read('server.py')
+          pathlib.Path('server.py').write_bytes(existing.replace(b'\r\n', b'\n'))
+          PY
+          git apply --check deployment/bandwidth.patch
+          git apply deployment/bandwidth.patch
+          python -m py_compile server.py
+          python - <<'PY'
+          import io, pathlib, zipfile
+          archive = pathlib.Path('hare-machi-render.zip')
+          edited = pathlib.Path('server.py').read_bytes()
+          out = io.BytesIO()
+          with zipfile.ZipFile(archive, 'r') as source:
+              with zipfile.ZipFile(out, 'w') as dest:
+                  dest.comment = source.comment
+                  for member in source.infolist():
+                      data = edited if member.filename == 'server.py' else source.read(member)
+                      dest.writestr(member, data)
+          archive.write_bytes(out.getvalue())
+          with zipfile.ZipFile(archive) as check:
+              assert check.testzip() is None
+              assert check.read('server.py') == edited
+          PY
+      - name: Commit archive update and trigger Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No archive change"
+          else
+            git commit -m "Apply bandwidth optimization to deployed server archive"
+            git push
+          fi
