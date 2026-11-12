@@ -1,34 +1,13 @@
 BOOTSTRAP PASSED
 EXTRA_SLOT_ADD PASSED {'student_id': '2999', 'operation': 'add', 'class_number': 3}
 EXTRA_SLOT_LIST PASSED
+REGISTER_LOGIN PASSED
 Traceback (most recent call last):
-  File "/tmp/admin-repair-pg/postgres.py", line 139, in execute
-    return self.connection.execute(sql, params)
-           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
-  File "/home/runner/.local/lib/python3.14/site-packages/psycopg/connection.py", line 304, in execute
-    raise ex.with_traceback(None)
-psycopg.errors.UndefinedTable: relation "auth_attempts" does not exist
-LINE 5:             LEFT JOIN auth_attempts a ON a.student_id=reques...
-                              ^
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-postgres.py", line 45, in <module>
-    assert account.login('2999','123456',now=1794480001)
-           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/tmp/admin-repair-pg/accounts.py", line 92, in login
-    user=self.db.execute('''SELECT p.id,p.salt,p.password_hash,a.failures,a.blocked_until
-         ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        FROM (SELECT CAST(? AS TEXT) AS student_id) requested
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        LEFT JOIN players p ON p.student_id=requested.student_id
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            AND NOT EXISTS (SELECT 1 FROM frozen_players f WHERE f.player_id=p.id)
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        LEFT JOIN auth_attempts a ON a.student_id=requested.student_id''',(student_id,)).fetchone()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/tmp/admin-repair-pg/postgres.py", line 143, in execute
-    raise sqlite3.OperationalError('PostgreSQL query failed') from error
-sqlite3.OperationalError: PostgreSQL query failed
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-postgres.py", line 61, in <module>
+    preview=perform(admin,{**payload,'action':'preview'},1794480000000)
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 144, in perform
+    payload=validate(data)
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 49, in validate
+    raise ValueError('正しい学籍番号4桁を入力してください。')
+ValueError: 正しい学籍番号4桁を入力してください。
 TEST_EXIT_CODE:1
