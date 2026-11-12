@@ -74,6 +74,40 @@ try:
         assert acct.db.execute('SELECT debt FROM bank_accounts WHERE player=?',(p,)).fetchone()[0]==0
         assert history(acct.db)[0]['student_id']=='2999'
         print('DEBT_APPLY PASSED')
+        # Simulate an old preview followed by a changed negative balance.
+        acct.db.execute('UPDATE factories SET cash=-500 WHERE player=?',(p,))
+        acct.db.commit()
+        new_preview=perform(admin,{**payload,'action':'preview'},1794480000001)
+        acct.db.execute('UPDATE factories SET cash=-999 WHERE player=?',(p,))
+        acct.db.commit()
+        changed=perform(admin,{**payload,'action':'apply',
+            'key':'abcd1234abcd1234abcd1235',
+            'preview_digest':new_preview['digest']},1794480000002)
+        assert changed['cash_restored_total']==999,changed
+        assert acct.db.execute('SELECT cash FROM factories WHERE player=?',
+                               (p,)).fetchone()[0]==0
+        print('CHANGED_BALANCE_CLEARED PASSED')
+        # A transaction locking another player's factory must not hold up
+        # forgiveness for this player. Former full-player FOR UPDATE did.
+        acct.db.execute("INSERT INTO players(id,student_id,display_name,class_number,salt,password_hash,created_at) "
+                        "VALUES('unrelated','2101','Other',1,?,?,0)",(b'0123456789abcdef',b'passwordhash'))
+        acct.db.execute("INSERT INTO factories(player,cash) VALUES('unrelated',99)")
+        acct.db.execute('UPDATE factories SET cash=-78 WHERE player=?',(p,))
+        acct.db.commit()
+        fresh_preview=perform(admin,{**payload,'action':'preview'},1794480000003)
+        import time
+        with pool.connection() as blocker:
+            blocker.execute('BEGIN')
+            blocker.execute("SELECT player FROM factories WHERE player='unrelated' FOR UPDATE")
+            start=time.monotonic()
+            final=perform(admin,{**payload,'action':'apply',
+                'key':'abcd1234abcd1234abcd1236',
+                'preview_digest':fresh_preview['digest']},1794480000004)
+            duration=time.monotonic()-start
+            assert duration<4.0,('unrelated player lock blocked forgiveness',duration)
+            assert final['cash_restored_total']==78,final
+            blocker.rollback()
+        print('UNRELATED_PLAYER_LOCK_NO_LONGER_BLOCKS PASSED')
     finally:
         acct.db.close()
 finally:
