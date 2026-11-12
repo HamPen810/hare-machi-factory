@@ -1,0 +1,48 @@
+name: Diagnose administrator finance and extra slots with PostgreSQL
+on:
+  push:
+    paths:
+      - .github/workflows/diagnose-admin-repair-pg.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diagnosis:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d testdb"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL test dependencies
+        run: pip install 'psycopg[binary]' psycopg-pool
+      - name: Run database end-to-end operations, capture failures
+        run: |
+          set +e
+          mkdir -p /tmp/admin-repair-pg
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for n in ('accounts.py','admin.py','admin_fund_ops.py','bank.py','market.py',
+                        'postgres.py','exact.py','event.py'):
+                  Path('/tmp/admin-repair-pg',n).write_bytes(z.read(n))
+          PY
+          PG_TEST_DSN=postgresql://tester:tester@127.0.0.1:5432/testdb             PYTHONPATH=/tmp/admin-repair-pg python deployment/test-admin-repair-postgres.py             >deployment/repair-postgres-diagnostic.txt 2>&1
+          printf 'TEST_EXIT_CODE:%s\n' "$?" >>deployment/repair-postgres-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/repair-postgres-diagnostic.txt
+          git commit -m "Record PostgreSQL admin repair integration diagnostics"
+          git push
