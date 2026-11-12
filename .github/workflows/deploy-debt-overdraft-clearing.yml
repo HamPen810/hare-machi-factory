@@ -42,3 +42,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add hare-machi-render.zip
           git diff --cached --quiet || { git commit -m "Forgive bank loans and reset negative player cash to zero"; git push; }
+
+# Trigger validated production release after diagnostic suites passed.
