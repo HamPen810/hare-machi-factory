@@ -58,6 +58,10 @@ try:
     try:
         admin=Admin(acct)
         payload={'scope':'single','kind':'forgive','student_id':'2999','note':'check'}
+        import admin_fund_ops
+        print('DEBUG_STUDENT',repr(payload.get('student_id')), type(payload.get('student_id')), len(payload['student_id']),payload['student_id'].isascii(),payload['student_id'].isdigit(),flush=True)
+        print('DEBUG_VALIDATE_SOURCE',admin_fund_ops.__file__,flush=True)
+        print('DEBUG_VALIDATE',admin_fund_ops.validate(payload),flush=True)
         preview=perform(admin,{**payload,'action':'preview'},1794480000000)
         assert preview['total']==300,preview
         print('DEBT_PREVIEW PASSED')
