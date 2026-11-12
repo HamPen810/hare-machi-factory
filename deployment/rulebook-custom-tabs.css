@@ -1,0 +1,8 @@
+#tp-page-rules.rb-custom-tabs-ready .rb-tabs{position:relative;z-index:2}
+#tp-page-rules.rb-custom-tabs-ready .rb-content{width:100%;min-width:0}
+#tp-page-rules.rb-custom-active .rb-panel>details{display:none!important}
+#tp-page-rules.rb-custom-tabs-ready #rulebook-custom{display:none!important}
+#tp-page-rules.rb-custom-tabs-ready .rb-panel .rb-custom-text{display:block;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;color:#263c34;background:rgba(255,253,245,.97);border:1px solid #e0e4d9;border-radius:12px;padding:15px 16px;margin:0 0 12px;font-size:15px;line-height:1.9;letter-spacing:.015em}
+#tp-page-rules.rb-custom-tabs-ready .rb-panel[hidden]{display:none!important}
+#tp-page-rules.rb-custom-tabs-ready .rb-tab[hidden]{display:none!important}
+@media(max-width:480px){#tp-page-rules.rb-custom-tabs-ready .rb-panel .rb-custom-text{font-size:15px;line-height:1.85;padding:14px}}
