@@ -1,0 +1,27 @@
+name: Snapshot deployed server for bandwidth instrumentation
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-bandwidth-server.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract actual production server
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              Path('deployment/bandwidth-server-snapshot.py').write_bytes(z.read('server.py'))
+          PY
+      - name: Commit inspection snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/bandwidth-server-snapshot.py
+          git diff --cached --quiet || { git commit -m "Inspect deployed server bandwidth response handling"; git push; }
