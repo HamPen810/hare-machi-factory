@@ -33,12 +33,7 @@ jobs:
               'url, min_size=0, max_size=(8 if os.environ.get("RENDER_SERVICE_NAME") == "hare-machi-factory-sg" else 1),\n        timeout=12, max_idle=15, open=True,')
           server=replace_once(server,
               'if status!=304:self.wfile.write(data)',
-              '''if status!=304:
-                try:
-                    self.wfile.write(data)
-                except (BrokenPipeError, ConnectionResetError):
-                    # Client closed the connection; no game transaction is lost.
-                    self.close_connection=True''')
+              'if status!=304:\n                try:\n                    self.wfile.write(data)\n                except (BrokenPipeError, ConnectionResetError):\n                    # Client closed the connection; no game transaction is lost.\n                    self.close_connection=True')
           for name,text in [('postgres.py',pg),('server.py',server)]:
               ast.parse(text,filename=name)
           output=io.BytesIO()
