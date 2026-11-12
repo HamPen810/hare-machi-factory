@@ -1,0 +1,47 @@
+name: Emergency Restore Player Data Display
+on:
+  push:
+    paths:
+      - .github/workflows/emergency-restore-data.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch deployed ZIP without changing database
+        run: python deployment/emergency-fix-db-pool.py
+      - name: Validate production modules, response lifecycle and player regressions
+        run: |
+          mkdir -p /tmp/hare-recovery
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          with ZipFile('hare-machi-render.zip') as z:
+              for filename in ('postgres.py','server.py','accounts.py','admin.py',
+                               'admin_fund_ops.py','admin_forgive_fast.py','bank.py',
+                               'market.py','exact.py','event.py'):
+                  data=z.read(filename)
+                  Path('/tmp/hare-recovery',filename).write_bytes(data)
+                  ast.parse(data.decode(),filename=filename)
+              s=z.read('server.py').decode()
+              p=z.read('postgres.py').decode()
+              assert s.index("read_db.close()") < s.index("data=json.dumps(wire(body)")
+              assert "if a.postgres and not write and (read_only or self.path=='/api/factory'):" in s
+              assert 'max_size=_safe_pool_limit()' in p
+              assert 'HARE_FACTORY_MAIN_PG_POOL", "6"' in p
+              assert "if payload['kind']=='forgive':" in z.read('admin_fund_ops.py').decode()
+              print('PASS connection released before JSON encoding; write routes untouched')
+          PY
+          PRODUCTION_MODULE_DIR=/tmp/hare-recovery python deployment/test-extra-student-slots.py
+          PRODUCTION_MODULE_DIR=/tmp/hare-recovery python deployment/test-fast-debt-forgiveness.py
+          PRODUCTION_MODULE_DIR=/tmp/hare-recovery python deployment/test-admin-debt-bulk.py
+      - name: Commit verified ZIP for existing Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Emergency: return read DB handles before response encoding and avoid PoolTimeout"; git push; }
