@@ -1,0 +1,80 @@
+name: Apply extreme-number stability fixes
+on:
+  push:
+    paths:
+      - .github/workflows/apply-numeric-stability.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Apply targeted updates inside current Render archive
+        run: python deployment/fix_numbers.py
+      - name: Validate modified application
+        shell: bash
+        run: |
+          mkdir -p /tmp/hare-game-check
+          python -m zipfile -e hare-machi-render.zip /tmp/hare-game-check
+          python -m compileall -q /tmp/hare-game-check
+          node --check /tmp/hare-game-check/static/app.js
+          node --check /tmp/hare-game-check/static/numbers.js
+          node --check /tmp/hare-game-check/static/admin.js
+          cd /tmp/hare-game-check
+          PYTHONPATH=. python - <<'PY'
+          import tempfile
+          from pathlib import Path
+          from accounts import Accounts
+          from market import Game, rare_count
+          from exact import wire
+          from datetime import datetime, timezone
+
+          huge = 10**309 + 123456789
+          for odds in (10**6, 10**10, 10**18, 10**30):
+              sampled = rare_count(huge, odds)
+              assert 0 < sampled < huge, odds
+          assert rare_count(10**5001, 10**30) > 0
+          with tempfile.TemporaryDirectory() as directory:
+              path = str(Path(directory) / "stability-test.sqlite")
+              account = Accounts(path)
+              now = int(datetime(2026,11,12,tzinfo=timezone.utc).timestamp() * 1000)
+              seller = account.register("seller", "2101", "123456", now//1000)
+              buyer = account.register("buyer", "2102", "123456", now//1000)
+              game = Game(account, clock=lambda: now, opens_at=0)
+              game._factory(seller)
+              game._factory(buyer)
+              account.db.execute("UPDATE stock SET quantity=? WHERE player=? AND product='white'", (huge, seller))
+              account.db.execute("UPDATE factories SET cash=? WHERE player=?", (huge*100, buyer))
+              account.db.commit()
+              seller_token = account.login("2101", "123456", now//1000)
+              buyer_token = account.login("2102", "123456", now//1000)
+              shipment = game.act(seller_token, "shipment", "ship", "white", huge, 8)
+              quote = game.market_quotes(buyer)["white"]
+              assert quote["quantity"] == huge - huge//4
+              purchased = game.act(buyer_token, "purchase", "buy_market", "white", quote["quantity"], 8)
+              assert purchased["bought"] == quote["quantity"]
+              assert game.act(buyer_token, "purchase", "buy_market", "white", quote["quantity"], 8) == purchased
+              assert account.db.execute("SELECT quantity FROM stock WHERE player=? AND product='white'", (buyer,)).fetchone()[0] == quote["quantity"]
+              assert game.breakdown(seller_token)["income"][0]["amount"] == 8*quote["quantity"]
+              assert account.own_history(seller_token,now//1000)[0]["revenue"] == 8*quote["quantity"]
+              assert wire({"amount": huge})["amount"] == str(huge)
+              account.db.close()
+          print("Extreme-number transaction smoke tests passed")
+          PY
+      - name: Commit tested archive and trigger automatic Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No archive changes"
+          else
+            git commit -m "Fix huge counters, shipments, charts and PostgreSQL pools"
+            git push
+          fi
