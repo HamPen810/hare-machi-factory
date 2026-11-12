@@ -1,7 +1,7 @@
 """Verify tax reduces cash but not ranked net profit or displayed expenses."""
 import sqlite3, json
 from pathlib import Path
-import accounts, market
+import accounts, market, bank
 
 db=sqlite3.connect(':memory:')
 db.row_factory=sqlite3.Row
@@ -40,8 +40,8 @@ db.execute("UPDATE bank_accounts SET tax=999999999 WHERE player='p'")
 assert sum(x['amount'] for x in game.breakdown('test-token')['expense'])==27
 
 # Tax deductions from actual cash must remain in both source paths.
-market_source=Path('market.py').read_text()
-bank_source=Path('bank.py').read_text()
+market_source=Path(market.__file__).read_text()
+bank_source=Path(bank.__file__).read_text()
 assert 'count * (price - cost) - tax' in market_source
 assert 'cash=bsub(cash,?)' in bank_source
 print('PASS: tax ledger does not change individual/class net profit or expense charts; cash still taxed.')
