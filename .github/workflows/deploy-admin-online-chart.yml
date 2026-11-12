@@ -39,3 +39,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add hare-machi-render.zip
           git diff --cached --quiet || { git commit -m "Show authenticated real-time online users with 24-hour chart"; git push; }
+
+# Re-run after normalizing legacy admin source line endings.
