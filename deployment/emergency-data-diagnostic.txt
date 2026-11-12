@@ -1,0 +1,9 @@
+PASS bounded timeline pages and PostgreSQL spending aggregation; all other game code untouched
+PATCH_STATUS:0
+COMPILE_STATUS:0
+PASS live stale estimate, fresh bank debt, overdraft-only, positive cash, no-op, idempotency, batch latest balances
+DEBT_STATUS:0
+PASS: explicit extra 4-digit IDs, class mapping, registration, login, revoked/duplicate slot safety
+SLOTS_STATUS:0
+POSTGRESQL PASS {'upgrade': Decimal('200')}
+POSTGRESQL_STATUS:0
