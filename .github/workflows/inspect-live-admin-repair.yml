@@ -1,0 +1,28 @@
+name: Inspect live admin failures safely
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-live-admin-repair.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract current ZIP source for diagnosis
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('server.py','admin.py','admin_fund_ops.py','accounts.py','postgres.py','static/admin.js','static/admin.html'):
+                  Path('deployment/repair-current-'+name.replace('/','-')).write_bytes(z.read(name))
+          PY
+      - name: Commit diagnostic snapshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/repair-current-*
+          git diff --cached --quiet || { git commit -m "Inspect production admin errors at current ZIP version"; git push; }
