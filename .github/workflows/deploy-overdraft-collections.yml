@@ -43,3 +43,5 @@ jobs:
             git commit -m "Allow negative admin collections and count them as expenses"
             git push
           fi
+
+# Tested on latest production archive with CRLF-safe migration.
