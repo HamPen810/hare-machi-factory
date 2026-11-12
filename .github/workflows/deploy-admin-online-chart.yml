@@ -1,0 +1,41 @@
+name: Deploy admin online player chart
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-admin-online-chart.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add dashboard online chart to current production archive
+        run: python deployment/add-admin-online-chart.py
+      - name: Validate backend online counter and browser chart
+        run: |
+          mkdir -p /tmp/admin-online-test
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.py','accounts.py','exact.py','bank.py','market.py','event.py'):
+                  Path('/tmp/admin-online-test',name).write_bytes(z.read(name))
+              Path('/tmp/admin-online-ui.js').write_bytes(z.read('static/admin.js'))
+              h=z.read('static/admin.html').decode()
+              s=z.read('server.py').decode()
+              assert 'id="tab-online"' in h and 'id="online-graph"' in h
+              assert "self.path=='/api/admin/online'" in s
+              assert "if self.path in ('/api/factory','/api/action','/api/snapshot')" in s
+              assert "if not cluster or role == 'A':" in s
+          PY
+          PYTHONPATH=/tmp/admin-online-test python deployment/test-admin-online-chart.py
+          PYTHONPATH=/tmp/admin-online-test python deployment/test-overdraft-admin-collections.py
+          node --check /tmp/admin-online-ui.js
+      - name: Publish tested archive to Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Show authenticated real-time online users with 24-hour chart"; git push; }
