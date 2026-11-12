@@ -1,0 +1,28 @@
+name: Inspect data endpoint payload structure
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-data-payload.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract production data-handling source
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('market.py','accounts.py','static/app.js'):
+                  Path('deployment/inspect-'+name.replace('/','-')).write_bytes(z.read(name))
+          PY
+      - name: Publish snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/inspect-*
+          git diff --cached --quiet || { git commit -m "Inspect data endpoint and client payload usage"; git push; }
