@@ -91,7 +91,7 @@ replace('static/app.js',
   Object.assign(snapshot,detail);
 """,
 """  const incremental=tab==='data' && Array.isArray(snapshot.timeline) && snapshot.timeline.length>0;
-  const mostRecent=incremental?Math.max(...snapshot.timeline.map(row=>Number(row.round))):0;
+  const mostRecent=incremental?snapshot.timeline.reduce((max,row)=>Math.max(max,Number(row.round)),0):0;
   const detail=await api(tab,undefined,incremental?{'X-Timeline-After':String(Math.max(0,mostRecent-1))}:{});
   if(gen!==generation||!snapshot)return;
   if(incremental){
@@ -139,7 +139,12 @@ replace('static/app.js',
  if(['income','expense'].includes(ui('metric').value))piePage--;
  else{
   chartOffset+=12;
-  if(snapshot?.timeline_more)void loadOlderTimeline();
+  if(snapshot?.timeline_more && snapshot.timeline.length){
+   const earliest=snapshot.timeline.reduce((min,row)=>Math.min(min,Number(row.round)),Infinity);
+   const latest=snapshot.timeline.reduce((max,row)=>Math.max(max,Number(row.round)),0);
+   const interval=Number($('#chart-interval').value);
+   if(chartOffset*interval >= latest-earliest-48)void loadOlderTimeline();
+  }
  }
  renderChart();
 };""")
