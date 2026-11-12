@@ -1,3 +1,6 @@
+import os,sys
+if os.environ.get('PRODUCTION_MODULE_DIR'):
+    sys.path.insert(0,os.environ['PRODUCTION_MODULE_DIR'])
 """Regression: extra IDs are opt-in and survive normal auth/financial controls."""
 import sqlite3,tempfile,os
 from accounts import Accounts,eligible,assigned_class
