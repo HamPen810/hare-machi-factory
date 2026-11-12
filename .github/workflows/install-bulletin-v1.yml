@@ -1,0 +1,67 @@
+name: Install tested announcements and player messaging
+on:
+  push:
+    paths:
+      - .github/workflows/install-bulletin-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hare-bulletin-archive
+  cancel-in-progress: false
+
+jobs:
+  patch-test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Apply changes only to the expected production ZIP
+        run: python deployment/apply-bulletin-v1.py
+      - name: Validate Python and browser code
+        run: |
+          mkdir -p /tmp/hare-bulletin
+          python -m zipfile -e hare-machi-render.zip /tmp/hare-bulletin
+          python -m compileall -q /tmp/hare-bulletin
+          node --check /tmp/hare-bulletin/static/app.js
+          node --check /tmp/hare-bulletin/static/admin.js
+          PYTHONPATH=/tmp/hare-bulletin python - <<'PY'
+          import sqlite3
+          import bulletin
+          c=sqlite3.connect(':memory:')
+          c.row_factory=sqlite3.Row
+          c.executescript("""CREATE TABLE site_announcements(revision BIGINT PRIMARY KEY,body TEXT);
+          CREATE TABLE players(id TEXT PRIMARY KEY,student_id TEXT,display_name TEXT,class_number INTEGER);
+          INSERT INTO players VALUES('p1','2101','Alice',1),('p2','2102','Bob',1);
+          INSERT INTO site_announcements VALUES(1,'Legacy');""")
+          bulletin.initialize(c)
+          global_id=bulletin.publish(c,'Global',None,1763000000000)['id']
+          personal_id=bulletin.publish(c,'Personal','2101',1763000000200)['id']
+          assert personal_id in [p['id'] for p in bulletin.player_posts(c,'p1')]
+          assert personal_id not in [p['id'] for p in bulletin.player_posts(c,'p2')]
+          bulletin.mark_read(c,'p1',personal_id,1763000001000)
+          try:
+              bulletin.mark_read(c,'p2',personal_id,1763000001000)
+              raise AssertionError('Private notice leak')
+          except ValueError:
+              pass
+          bulletin.send_message(c,'p2','Contact admin',1763000002000)
+          assert bulletin.admin_messages(c)[0]['student_id']=='2102'
+          bulletin.delete(c,global_id,1763000003000)
+          assert global_id not in [p['id'] for p in bulletin.player_posts(c,'p1')]
+          print('Announcement tests passed')
+          PY
+      - name: Commit production ZIP to trigger existing Render auto-deploys
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No ZIP changes"
+          else
+            git commit -m "Implement announcements, player inbox and scientific buy quantities"
+            git push
+          fi
