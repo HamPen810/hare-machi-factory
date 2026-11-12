@@ -1,0 +1,38 @@
+name: Fix independent bank transactions
+on:
+  push:
+    paths:
+      - .github/workflows/fix-parallel-bank.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Update bank logic and interface in deployment ZIP
+        run: python deployment/allow-parallel-bank.py
+      - name: Run exact integer bank regression test
+        run: python deployment/test-parallel-bank.py
+      - name: Verify frontend JavaScript
+        run: |
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              open('/tmp/bank-app.js','wb').write(z.read('static/app.js'))
+          PY
+          node --check /tmp/bank-app.js
+      - name: Commit updated ZIP for Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No changes to deploy"
+          else
+            git commit -m "Allow simultaneous bank deposits and borrowing"
+            git push
+          fi
