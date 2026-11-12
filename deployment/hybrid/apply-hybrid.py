@@ -69,7 +69,7 @@ replace('server.py',
 
 for f in ('server.py',):
     ast.parse(files[f].decode('utf8'),filename=f)
-for mod in ('hybrid_router.py','hybrid_worker.py'):
+for mod in ('hybrid_router.py','hybrid_worker.py','oracle_deploy_agent.py'):
     code=Path('deployment/hybrid/'+mod).read_bytes()
     ast.parse(code.decode('utf8'),filename=mod)
     if mod in files:raise RuntimeError(f'{mod} already in archive; inspect before patching')
@@ -80,7 +80,7 @@ with ZipFile(out,'w') as z:
     z.comment=comment
     for info,data in entries:
         z.writestr(info,files[info.filename])
-    for mod in ('hybrid_router.py','hybrid_worker.py'):
+    for mod in ('hybrid_router.py','hybrid_worker.py','oracle_deploy_agent.py'):
         z.writestr(mod,files[mod])
 with ZipFile(io.BytesIO(out.getvalue())) as z:
     assert z.testzip() is None
