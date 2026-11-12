@@ -1,0 +1,41 @@
+name: Diagnose admin collection deployment
+on:
+  push:
+    paths:
+      - .github/workflows/diagnose-overdraft.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reproduce production patch and tests with captured diagnostics
+        run: |
+          set +e
+          {
+            python deployment/allow-overdraft-admin-collections.py
+            echo "PATCH_STATUS:$?"
+            mkdir -p /tmp/admin-overdraft-diag
+            python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.py','accounts.py','market.py','bank.py','exact.py','event.py'):
+                  Path('/tmp/admin-overdraft-diag',name).write_bytes(z.read(name))
+              Path('/tmp/overdraft-admin-diag.js').write_bytes(z.read('static/admin.js'))
+              Path('/tmp/overdraft-app-diag.js').write_bytes(z.read('static/app.js'))
+          PY
+            PYTHONPATH=/tmp/admin-overdraft-diag python deployment/test-overdraft-admin-collections.py
+            echo "TEST_STATUS:$?"
+            node --check /tmp/overdraft-admin-diag.js
+            echo "ADMIN_JS_STATUS:$?"
+            node --check /tmp/overdraft-app-diag.js
+            echo "APP_JS_STATUS:$?"
+          } >deployment/overdraft-diagnostic.txt 2>&1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/overdraft-diagnostic.txt
+          git commit -m "Record admin collection deployment diagnostics"
+          git push
