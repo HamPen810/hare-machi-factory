@@ -1,0 +1,31 @@
+name: Inspect banking implementation
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-bank-source.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Snapshot current banking source and UI references
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              Path('deployment/bank-source-snapshot.py').write_bytes(z.read('bank.py'))
+              Path('deployment/bank-ui-snapshot.js').write_bytes(z.read('static/app.js'))
+              Path('deployment/bank-ui-snapshot.html').write_bytes(z.read('static/index.html'))
+              Path('deployment/bank-postgres-snapshot.py').write_bytes(z.read('postgres.py'))
+          PY
+      - name: Publish source snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/bank-*-snapshot.*
+          git commit -m "Snapshot current bank logic for multi-contract implementation"
+          git push
