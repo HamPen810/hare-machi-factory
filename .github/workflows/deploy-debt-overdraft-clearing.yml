@@ -33,9 +33,9 @@ jobs:
           node --check /tmp/clear-debt-admin.js
       - name: Regression test bank loan and negative cash forgiveness
         run: |
-          PYTHONPATH=/tmp/clear-debt python deployment/test-debt-overdraft-clearing.py
-          PYTHONPATH=/tmp/clear-debt python deployment/test-admin-debt-bulk.py
-          PYTHONPATH=/tmp/clear-debt python deployment/test-extra-student-slots.py
+          PRODUCTION_MODULE_DIR=/tmp/clear-debt PYTHONPATH=/tmp/clear-debt python deployment/test-debt-overdraft-clearing.py
+          PRODUCTION_MODULE_DIR=/tmp/clear-debt PYTHONPATH=/tmp/clear-debt python deployment/test-admin-debt-bulk.py
+          PRODUCTION_MODULE_DIR=/tmp/clear-debt PYTHONPATH=/tmp/clear-debt python deployment/test-extra-student-slots.py
       - name: Publish tested ZIP and trigger Render deployment
         run: |
           git config user.name "github-actions[bot]"
