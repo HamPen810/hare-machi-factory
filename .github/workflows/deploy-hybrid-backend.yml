@@ -1,0 +1,44 @@
+name: Build and verify opt-in hybrid backend
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-hybrid-backend.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch current deployed ZIP with optional hybrid worker and router
+        run: python deployment/hybrid/apply-hybrid.py
+      - name: Run integration safety tests
+        run: |
+          mkdir -p /tmp/hybrid-app-test
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('server.py','accounts.py','exact.py','bank.py','market.py','event.py',
+                           'admin.py','hybrid_router.py','hybrid_worker.py','oracle_deploy_agent.py'):
+                  Path('/tmp/hybrid-app-test',name).write_bytes(z.read(name))
+              s=z.read('server.py').decode()
+              assert "self.path=='/api/ranks'" in s
+              assert "hybrid.calculate(" in s
+              assert "'rankings',local_rankings,isolated_local_rankings" in s
+              assert "self.path=='/api/admin/hybrid'" in s
+              assert "if write and self.path=='/api/action'" in s
+              assert "if self.path=='/api/admin/funds-extra'" in s
+          PY
+          PYTHONPATH=/tmp/hybrid-app-test python deployment/hybrid/test_hybrid.py
+          PYTHONPATH=/tmp/hybrid-app-test python deployment/test-extra-student-slots.py
+          PYTHONPATH=/tmp/hybrid-app-test python deployment/test-admin-debt-bulk.py
+          PYTHONPATH=/tmp/hybrid-app-test python deployment/test-admin-online-chart.py
+          python -m compileall -q /tmp/hybrid-app-test
+      - name: Publish tested archive to main, triggering existing Render auto deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Add opt-in Oracle hybrid rank computation and safe Render fallback"; git push; }
