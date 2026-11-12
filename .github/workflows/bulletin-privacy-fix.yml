@@ -1,0 +1,62 @@
+name: Prevent cross-account bulletin disclosure
+on:
+  push:
+    paths:
+      - .github/workflows/bulletin-privacy-fix.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-bulletin-privacy
+  cancel-in-progress: false
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Clear private notices on logout and expired sessions
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          import os
+          from pathlib import Path
+          archive=Path('hare-machi-render.zip')
+          temp=archive.with_suffix('.zip.tmp')
+          replacements=[
+              ("if(response.status===401&&requestGeneration===generation){$('#game').hidden=true;$('#auth').hidden=false;snapshot=null;}",
+               "if(response.status===401&&requestGeneration===generation){$('#game').hidden=true;$('#auth').hidden=false;snapshot=null;bulletinPosts=[];renderAnnouncements();}"),
+              ("$('#logout').onclick=async()=>{try{await api('logout',{});generation++;snapshot=null;$('#game').hidden=true;$('#auth').hidden=false;notice('');}catch(e){notice(e.message);}};",
+               "$('#logout').onclick=async()=>{try{await api('logout',{});generation++;snapshot=null;bulletinPosts=[];renderAnnouncements();$('#game').hidden=true;$('#auth').hidden=false;notice('');}catch(e){notice(e.message);}};")
+          ]
+          with ZipFile(archive) as src,ZipFile(temp,'w') as dest:
+              assert 'bulletin.py' in src.namelist(), 'Bulletin patch must be installed first'
+              script=src.read('static/app.js').decode('utf-8')
+              for old,new in replacements:
+                  assert old in script or new in script, 'Unexpected concurrent UI update'
+                  if old in script:script=script.replace(old,new,1)
+              for member in src.infolist():
+                  content=script.encode('utf-8') if member.filename=='static/app.js' else src.read(member)
+                  dest.writestr(member,content)
+          os.replace(temp,archive)
+          with ZipFile(archive) as z:
+              source=z.read('static/app.js').decode('utf-8')
+              assert all(new in source for old,new in replacements)
+              assert z.testzip() is None
+          PY
+      - name: Verify JavaScript parse
+        run: |
+          unzip -p hare-machi-render.zip static/app.js >/tmp/bulletin-privacy-app.js
+          node --check /tmp/bulletin-privacy-app.js
+      - name: Commit tested archive and trigger Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+          else
+            git commit -m "Clear private announcements on logout and auth expiry"
+            git push
+          fi
