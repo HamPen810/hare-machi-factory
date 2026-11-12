@@ -1,0 +1,47 @@
+name: Diagnose and apply tax-only cash accounting
+on:
+  push:
+    paths:
+      - .github/workflows/tax-accounting-diagnostic.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Run guarded patch and accounting tests, publish result
+        shell: bash
+        run: |
+          set +e
+          (
+            set -e
+            python deployment/exclude-tax-from-profit.py
+            mkdir -p /tmp/hare-tax-modules
+            python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as archive:
+              for filename in ('accounts.py', 'market.py', 'bank.py', 'exact.py', 'event.py'):
+                  Path('/tmp/hare-tax-modules', filename).write_bytes(archive.read(filename))
+          PY
+            python -m compileall -q /tmp/hare-tax-modules
+            PYTHONPATH=/tmp/hare-tax-modules python deployment/test-tax-accounting.py
+          ) > /tmp/tax-result.log 2>&1
+          status=$?
+          cat /tmp/tax-result.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$status" -eq 0 ]; then
+            git add hare-machi-render.zip
+            git commit -m "Exclude paid taxes from expenses and net profit"
+          else
+            cp /tmp/tax-result.log deployment/tax-check-result.txt
+            git add deployment/tax-check-result.txt
+            git commit -m "Record tax accounting verification failure"
+          fi
+          git push
+          exit "$status"
