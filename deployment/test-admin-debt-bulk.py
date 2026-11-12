@@ -1,3 +1,6 @@
+import os,sys
+if os.environ.get('PRODUCTION_MODULE_DIR'):
+    sys.path.insert(0,os.environ['PRODUCTION_MODULE_DIR'])
 """Regression tests: wealth-based grants, overdraft collections and debt forgiveness."""
 import sqlite3
 from types import SimpleNamespace
