@@ -1,0 +1,41 @@
+name: Package Oracle hybrid handoff ZIP
+on:
+  push:
+    paths:
+      - .github/workflows/package-hybrid-handoff.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Create transfer ZIP containing only deployment/hybrid
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile,ZIP_DEFLATED
+          import hashlib, json
+          folder=Path('deployment/hybrid')
+          files=sorted(p for p in folder.rglob('*') if p.is_file())
+          assert len(files)==13, f'Expected 13 handoff files, found {len(files)}'
+          output=Path('deployment/hybrid-oracle-transfer.zip')
+          with ZipFile(output,'w',ZIP_DEFLATED,compresslevel=9) as z:
+              for file in files:
+                  z.write(file,file.as_posix())
+          with ZipFile(output) as z:
+              assert z.testzip() is None
+              assert len(z.namelist())==13
+              assert all(s.startswith('deployment/hybrid/') for s in z.namelist())
+          print('PACKED:',len(files),'files',output.stat().st_size,'bytes')
+          print('SHA256:',hashlib.sha256(output.read_bytes()).hexdigest())
+          PY
+      - name: Commit export ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/hybrid-oracle-transfer.zip
+          git diff --cached --quiet || { git commit -m "Package standalone Oracle hybrid handoff ZIP"; git push; }
