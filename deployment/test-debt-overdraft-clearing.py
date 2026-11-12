@@ -101,17 +101,14 @@ assert (cash('p'),cash('q'),cash('r'),cash('s'))==(0,0,400,100)
 assert debt('p')==0
 assert db.execute("SELECT COUNT(*) FROM admin_overdraft_cancellations").fetchone()[0]==5
 
-# Stale preview cannot overwrite a balance changed by another action.
+# A changed estimated amount must still be reset to zero using current cash.
 db.execute("UPDATE factories SET cash=-22 WHERE player='q'")
 db.commit()
 v=view(q)
 db.execute("UPDATE factories SET cash=-23 WHERE player='q'")
 db.commit()
-try:
-    run(q,v,'abcd-0000000000000005')
-    raise AssertionError('stale forgiveness applied')
-except ValueError as exc:
-    assert 'もう一度試算' in str(exc)
-assert cash('q')==-23
+result=run(q,v,'abcd-0000000000000005')
+assert result['cash_restored_total']==23,result
+assert cash('q')==0
 
-print('PASS: loan and overdraft relief, cash-only overdraft, positive cash protected, deposit preserved, bulk, audit, idempotence, stale preview')
+print('PASS: loans, cash-only overdraft, positive cash preserved, deposits, bulk, audit, idempotence, changed preview accepted')
