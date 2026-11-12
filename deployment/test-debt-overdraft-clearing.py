@@ -1,3 +1,6 @@
+import os,sys
+if os.environ.get('PRODUCTION_MODULE_DIR'):
+    sys.path.insert(0,os.environ['PRODUCTION_MODULE_DIR'])
 """Regression: forgive bank loan and negative cash together, exactly once."""
 import sqlite3
 from types import SimpleNamespace
