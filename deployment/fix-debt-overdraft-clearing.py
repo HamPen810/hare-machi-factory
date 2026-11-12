@@ -85,30 +85,7 @@ change(name,
         item['cash_restored']=cash.get(item['key'],0)
         item.pop('key')
     return rows""")
-# Install additive audit table. It never alters bank or historical balances.
-change(name,
-"""def _digits(value, *, optional=False):""",
-"""def _digits(value, *, optional=False):""") if False else None
-change(name,
-"""def _digits(value, *, optional=False):""",
-"""def _digits(value, *, optional=False):""") if False else None
-
-# Add audit DDL within the existing schema installer directly before _digits.
-change(name,
-"""def _digits(value, *, optional=False):""",
-"""def _digits(value, *, optional=False):""") if False else None
-
-# Active insertion:
-change(name,
-"""def _digits(value, *, optional=False):""",
-"""def _digits(value, *, optional=False):""") if False else None
-
-# Prevent a nonexisting-table read by extending install() in a targeted way.
-change(name,
-"""def _digits(value, *, optional=False):""",
-"""def _digits(value, *, optional=False):""") if False else None
-
-# Implementation directly: inspect current body between install and _digits.
+# Install additional cash recovery audit table without altering historical rows.
 s=files[name].decode('utf-8')
 boundary='\ndef _digits(value, *, optional=False):'
 assert s.count(boundary)==1
