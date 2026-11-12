@@ -25,7 +25,7 @@ jobs:
               assert 'id="tab-hybrid"' in h and 'id="hybrid-metrics"' in h
               assert "api('hybrid')" in j
               assert "if not cluster or role == 'A':" in z.read('server.py').decode()
-              for name in ('hybrid_router.py','hybrid_worker.py','oracle_deploy_agent.py'):
+              for name in ('hybrid_router.py','hybrid_worker.py','oracle_deploy_agent.py','accounts.py','bank.py','exact.py'):
                   Path('/tmp/hybrid-monitor',name).write_bytes(z.read(name))
               Path('/tmp/hybrid-monitor-admin.js').write_text(j)
           PY
