@@ -1,0 +1,39 @@
+name: Enable manual account entry for admin funds
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-funds-manual-entry.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch production archive
+        run: python deployment/fix-funds-manual-entry.py
+      - name: Validate browser and preservation of accounting
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              h=z.read('static/admin.html').decode()
+              js=z.read('static/admin.js').decode()
+              assert '<datalist id="funds-options">' in h
+              assert 'input id="funds-target" type="text"' in h
+              assert 'fundsPlayers.find' in js
+              assert '/^[0-9]{4}$/.test(student_id)' in js
+              assert '学籍番号を直接入力して操作できます' in js
+              assert 'fundsTarget.options' not in js
+              Path('/tmp/admin-manual-entry.js').write_text(js)
+          print('PASS: manual entry works without dashboard or suggestions')
+          PY
+          node --check /tmp/admin-manual-entry.js
+      - name: Push tested production ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Allow fund recipient entry by student ID without dropdown"; git push; }
