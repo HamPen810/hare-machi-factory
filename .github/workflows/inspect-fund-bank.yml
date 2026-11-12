@@ -1,0 +1,28 @@
+name: Inspect current bank contract schema
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-fund-bank.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract current production bank and admin
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('bank.py','admin.py','static/admin.js','static/admin.html','market.py'):
+                  Path('deployment/bulk-inspect-'+name.replace('/','-')).write_bytes(z.read(name))
+          PY
+      - name: Commit snapshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/bulk-inspect-*
+          git diff --cached --quiet || { git commit -m "Inspect current debt contracts and admin funds UI"; git push; }
