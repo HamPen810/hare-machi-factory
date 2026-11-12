@@ -50,3 +50,5 @@ jobs:
 # Recheck with complete login/session database fixture.
 
 # Diagnose precise validation expression for student IDs.
+
+# Force imports from extracted production ZIP modules.
