@@ -1,0 +1,52 @@
+name: Sync approved hybrid release to Oracle VM
+on:
+  push:
+    branches: [main]
+    paths:
+      - hare-machi-render.zip
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Deploy over authenticated HTTPS webhook
+        env:
+          ORACLE_DEPLOY_URL: ${{ secrets.ORACLE_DEPLOY_URL }}
+          ORACLE_DEPLOY_SECRET: ${{ secrets.ORACLE_DEPLOY_SECRET }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import hashlib,hmac,json,os,secrets,time,urllib.parse,urllib.request
+          url=os.environ.get('ORACLE_DEPLOY_URL','')
+          secret=os.environ.get('ORACLE_DEPLOY_SECRET','')
+          if not url or not secret:
+              print('Oracle deployment is not connected; skip without altering Render.')
+              raise SystemExit(0)
+          parsed=urllib.parse.urlsplit(url)
+          if parsed.scheme!='https' or parsed.path!='/internal/deploy' or not parsed.hostname or len(secret)<32:
+              raise SystemExit('Oracle webhook requires a trusted HTTPS URL and 32+ character secret')
+          sha=os.environ['DEPLOY_SHA']
+          # A scheduled workflow uses the checked-out main commit. Never deploy
+          # an arbitrary input SHA from an untrusted actor.
+          if len(sha)!=40 or any(c not in '0123456789abcdef' for c in sha):
+              raise SystemExit('Invalid release SHA')
+          payload=json.dumps({'sha':sha,'nonce':secrets.token_hex(16)},
+                             separators=(',',':')).encode('utf-8')
+          ts=str(int(time.time()))
+          sig=hmac.new(secret.encode(),ts.encode()+b'\n'+payload,hashlib.sha256).hexdigest()
+          req=urllib.request.Request(url,data=payload,method='POST',headers={
+              'Content-Type':'application/json','X-Hybrid-Timestamp':ts,
+              'X-Hybrid-Signature':sig})
+          with urllib.request.urlopen(req,timeout=240) as response:
+              result=json.loads(response.read(8192))
+              if response.status!=200 or result.get('sha')!=sha or not result.get('ok'):
+                  raise SystemExit('Oracle deployment not confirmed')
+              print('Oracle release verified:',sha)
+          PY
