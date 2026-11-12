@@ -1,0 +1,26 @@
+# Oracle Cloud: HTTPS on the only accessible inbound port.
+# Provision a trusted certificate whose SAN matches HYBRID_ORACLE_URL's host.
+# Caddy terminates TLS; Python services listen only on localhost.
+:25565 {
+    tls /etc/hare-hybrid/tls/cert.pem /etc/hare-hybrid/tls/key.pem
+    encode gzip
+
+    @compute path /internal/compute
+    handle @compute {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    @deploy path /internal/deploy
+    handle @deploy {
+        reverse_proxy 127.0.0.1:8001
+    }
+
+    @health path /health
+    handle @health {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        respond "not found" 404
+    }
+}
