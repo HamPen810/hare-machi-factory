@@ -81,9 +81,10 @@ with legacy:
 assert bank.player_state(legacy,'user',NOW+HOUR)['deposit']==0
 
 # Cash balance check must still reject overdraw and preserve contracts.
+legacy.execute("UPDATE factories SET cash=0 WHERE player='user'")
 before=bank.player_state(legacy,'user',NOW+HOUR)
 try:
-    with legacy: bank.player_action(legacy,'user','bank_lend',str(10**370),NOW+HOUR,CLOSE)
+    with legacy: bank.player_action(legacy,'user','bank_lend','100',NOW+HOUR,CLOSE)
     raise AssertionError('deposit without enough cash succeeded')
 except ValueError: pass
 assert bank.player_state(legacy,'user',NOW+HOUR)['contracts']==before['contracts']
