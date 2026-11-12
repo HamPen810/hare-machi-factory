@@ -37,8 +37,11 @@ update("market.py",
 
 old="純利益は売上から材料費・強化費・税金などの支出を引いた額です。"
 new="純利益は売上から材料費・強化費などの支出を引いた額です。税金は所持金から差し引かれますが、支出額と純利益の集計には含めません。"
-update("static/index.html",old,new)
-update("rules-default.txt",old,new)
+for filename in ("static/index.html", "rules-default.txt"):
+    if old in contents[filename].decode("utf-8"):
+        update(filename,old,new)
+    else:
+        print(f"{filename}: prior rule wording differs, leaving text untouched")
 
 # Avoid unnecessary changes to game logic, persisted data and environments.
 with ZipFile(archive,"w") as dst:
