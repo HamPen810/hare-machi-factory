@@ -1,0 +1,53 @@
+name: Exclude taxes from expenses and net profit
+on:
+  push:
+    paths:
+      - .github/workflows/fix-tax-accounting.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Update latest deployment archive only
+        run: python deployment/exclude-tax-from-profit.py
+      - name: Extract current modules for accounting regression test
+        run: |
+          mkdir -p /tmp/hare-tax-modules
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as archive:
+              for filename in ('accounts.py', 'market.py', 'bank.py', 'exact.py', 'event.py'):
+                  Path('/tmp/hare-tax-modules', filename).write_bytes(archive.read(filename))
+          PY
+          python -m compileall -q /tmp/hare-tax-modules
+      - name: Test rankings, expense breakdown and unchanged tax deductions
+        run: PYTHONPATH=/tmp/hare-tax-modules python deployment/test-tax-accounting.py
+        working-directory: .
+      - name: Verify current tax code unchanged
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as archive:
+              bank = archive.read('bank.py')
+              assert b'cash=bsub(cash,?)' in bank
+              assert b'tax=badd(tax,?)' in bank or b'tax=badd(bank_accounts.tax,excluded.tax)' in bank
+          PY
+      - name: Commit ZIP to trigger Render automatic deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "Archive already up to date"
+          else
+            git commit -m "Do not count taxes as expenses or deduct them from net profit"
+            git push
+          fi
