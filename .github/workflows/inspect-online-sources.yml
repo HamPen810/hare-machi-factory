@@ -1,0 +1,28 @@
+name: Inspect latest online admin sources
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-online-sources.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract latest relevant production code
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('server.py','admin.py','accounts.py','postgres.py','static/admin.js','static/admin.html','static/app.js'):
+                  Path('deployment/online-inspect-'+name.replace('/','-')).write_bytes(z.read(name))
+          PY
+      - name: Commit inspection files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/online-inspect-*
+          git diff --cached --quiet || { git commit -m "Snapshot current admin and game server to implement online graph"; git push; }
