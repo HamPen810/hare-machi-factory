@@ -1,46 +1,14 @@
 PASS: debt cancellation and bulk operations added, original bank/market code preserved
 PATCH_STATUS:0
 Traceback (most recent call last):
-  File "<stdin>", line 5, in <module>
-  File "/usr/lib/python3.14/zipfile/__init__.py", line 1681, in read
-    with self.open(name, "r", pwd) as fp:
-         ~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.14/zipfile/__init__.py", line 1718, in open
-    zinfo = self.getinfo(name)
-  File "/usr/lib/python3.14/zipfile/__init__.py", line 1646, in getinfo
-    raise KeyError(
-        'There is no item named %r in the archive' % name)
-KeyError: "There is no item named 'admin_fund_ops.py' in the archive"
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 69, in <module>
-    apply(collect,v,'cccccccc-cccc-4ccc-cccc-cccccccccccc')
-    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 45, in apply
-    return perform(admin,{**payload,'action':'apply','preview_digest':view['digest'],'key':k},now)
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 170, in perform
-    snapshot=plan(db,postgres,payload)
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 95, in <module>
+    v=preview(single)
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 43, in preview
+    return perform(admin,{**payload,'action':'preview'},now)
+  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 146, in perform
+    result=plan(db,postgres,payload)
   File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 126, in plan
     raise ValueError('条件に合う操作対象者がいません。')
 ValueError: 条件に合う操作対象者がいません。
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-debt-bulk.py", line 71, in <module>
-    except ValueError as e:assert 'もう一度試算' in str(e)
-                                  ^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError
 TEST_STATUS:1
-node:internal/modules/cjs/loader:1568
-  throw err;
-  ^
-
-Error: Cannot find module '/tmp/admin-debt-bulk-diag.js'
-    at node:internal/modules/cjs/loader:1564:15
-    at node:internal/main/check_syntax:33:20 {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: []
-}
-
-Node.js v24.22.2
-JS_STATUS:1
+JS_STATUS:0
