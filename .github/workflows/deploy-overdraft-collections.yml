@@ -1,0 +1,45 @@
+name: Deploy collection expenses and negative balances
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-overdraft-collections.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch latest production archive
+        run: python deployment/allow-overdraft-admin-collections.py
+      - name: Test balance, rankings, expenses and historical transfers
+        run: |
+          mkdir -p /tmp/admin-overdraft-test
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.py','accounts.py','market.py','bank.py','exact.py','event.py'):
+                  Path('/tmp/admin-overdraft-test',name).write_bytes(z.read(name))
+              Path('/tmp/overdraft-app.js').write_bytes(z.read('static/app.js'))
+              Path('/tmp/overdraft-admin.js').write_bytes(z.read('static/admin.js'))
+              h=z.read('static/admin.html').decode()
+              assert '残高がマイナスになる場合も実行できます' in h
+          PY
+          PYTHONPATH=/tmp/admin-overdraft-test python deployment/test-overdraft-admin-collections.py
+          node --check /tmp/overdraft-app.js
+          node --check /tmp/overdraft-admin.js
+      - name: Commit tested deployment to Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No archive change"
+          else
+            git commit -m "Allow negative admin collections and count them as expenses"
+            git push
+          fi
