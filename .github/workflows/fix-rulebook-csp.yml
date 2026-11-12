@@ -1,0 +1,41 @@
+name: Fix rulebook CSP blocked script
+on:
+  push:
+    paths:
+      - .github/workflows/fix-rulebook-csp.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Integrate tabs in allowed static paths
+        run: python deployment/repair-rulebook-csp.py
+      - name: Check JavaScript and HTML serving constraints
+        run: |
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              open('/tmp/rulebook-current.js','wb').write(z.read('static/tabs.js'))
+              html=z.read('static/index.html').decode()
+              server=z.read('server.py').decode()
+              assert "'/tabs.js'" in server
+              assert "'/island.css'" in server
+              assert 'src="/tabs.js"' in html
+          PY
+          node --check /tmp/rulebook-current.js
+      - name: Commit updated Render deployment archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No archive changes"
+          else
+            git commit -m "Fix rulebook tabs by loading via CSP-allowed assets"
+            git push
+          fi
