@@ -1,0 +1,21 @@
+[Unit]
+Description=Hare Machi Factory Oracle Read-only Compute Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=harehybrid
+Group=harehybrid
+WorkingDirectory=/opt/hare-hybrid/current
+EnvironmentFile=/etc/hare-hybrid.env
+ExecStart=/opt/hare-hybrid/current/venv/bin/python /opt/hare-hybrid/current/hybrid_worker.py --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=4
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
