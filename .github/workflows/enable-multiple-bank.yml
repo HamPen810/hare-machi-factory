@@ -1,0 +1,40 @@
+name: Test and deploy concurrent bank contracts
+on:
+  push:
+    paths:
+      - .github/workflows/enable-multiple-bank.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch only bank business logic and UI in current ZIP
+        run: python deployment/enable-multiple-bank-contracts.py
+      - name: Test individual contracts, legacy data and large numbers
+        run: |
+          mkdir -p /tmp/hare-bank-test
+          python - <<'PY'
+          import zipfile, pathlib
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              for name in ('bank.py','exact.py'):
+                  pathlib.Path('/tmp/hare-bank-test',name).write_bytes(z.read(name))
+              pathlib.Path('/tmp/hare-bank-app.js').write_bytes(z.read('static/app.js'))
+          PY
+          PYTHONPATH=/tmp/hare-bank-test python deployment/test-multiple-bank-contracts.py
+          node --check /tmp/hare-bank-app.js
+      - name: Commit and trigger existing Render services
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No ZIP changes"
+          else
+            git commit -m "Support multiple simultaneous bank lending and borrowing contracts"
+            git push
+          fi
