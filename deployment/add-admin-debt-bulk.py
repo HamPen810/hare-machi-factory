@@ -247,6 +247,7 @@ out=io.BytesIO()
 with ZipFile(out,'w') as z:
     z.comment=comment
     for info,data in entries:z.writestr(info,files[info.filename])
+    z.writestr('admin_fund_ops.py',files['admin_fund_ops.py'])
 with ZipFile(io.BytesIO(out.getvalue())) as z:
     assert z.testzip() is None
     for info,data in entries:
