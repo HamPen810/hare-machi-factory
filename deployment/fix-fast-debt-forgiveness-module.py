@@ -141,8 +141,14 @@ def execute(admin,payload,data,now):
                        (player,))
             # Compare in DB as well as in preview; a positive balance is
             # never reduced to zero. Includes balances beyond 64-bit integer.
-            db.execute('UPDATE factories SET cash=0 '
-                       'WHERE player=? AND bge(0,cash)',(player,))
+            if postgres:
+                # PostgreSQL stores cash as NUMERIC. The SQLite-only bge()
+                # function does not exist on PostgreSQL and caused 503s.
+                db.execute('UPDATE factories SET cash=0 '
+                           'WHERE player=? AND cash<0',(player,))
+            else:
+                db.execute('UPDATE factories SET cash=0 '
+                           'WHERE player=? AND bge(0,cash)',(player,))
             item_key=key+'-'+str(index)
             db.execute(
                 'INSERT INTO admin_debt_cancellations'
