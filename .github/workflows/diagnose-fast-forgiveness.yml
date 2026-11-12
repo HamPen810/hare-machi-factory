@@ -1,0 +1,60 @@
+name: Diagnose live-balance forgiveness and row locks
+on:
+  push:
+    paths:
+      - .github/workflows/diagnose-fast-forgiveness.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d testdb"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record patch and all regression outputs
+        run: |
+          set +e
+          {
+            python deployment/apply-fast-debt-forgiveness.py
+            echo "PATCH:$?"
+            mkdir -p /tmp/fast-debt-diag
+            python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for n in ('accounts.py','admin.py','admin_fund_ops.py','admin_forgive_fast.py','bank.py','market.py','exact.py','postgres.py','event.py'):
+                  Path('/tmp/fast-debt-diag',n).write_bytes(z.read(n))
+              Path('/tmp/fast-debt-diag.js').write_bytes(z.read('static/admin.js'))
+          PY
+            PRODUCTION_MODULE_DIR=/tmp/fast-debt-diag python deployment/test-fast-debt-forgiveness.py
+            echo "LIVE_BALANCE:$?"
+            PRODUCTION_MODULE_DIR=/tmp/fast-debt-diag python deployment/test-debt-overdraft-clearing.py
+            echo "OLD_DEBT:$?"
+            PRODUCTION_MODULE_DIR=/tmp/fast-debt-diag python deployment/test-admin-debt-bulk.py
+            echo "BULK:$?"
+            PRODUCTION_MODULE_DIR=/tmp/fast-debt-diag python deployment/test-extra-student-slots.py
+            echo "SLOTS:$?"
+            node --check /tmp/fast-debt-diag.js
+            echo "JAVASCRIPT:$?"
+            pip install -q 'psycopg[binary]' psycopg-pool
+            PG_TEST_DSN=postgresql://tester:tester@127.0.0.1:5432/testdb PG_PRODUCTION_DIR=/tmp/fast-debt-diag PRODUCTION_MODULE_DIR=/tmp/fast-debt-diag python deployment/test-admin-repair-postgres.py
+            echo "POSTGRESQL:$?"
+          } >deployment/fast-debt-diagnostic.txt 2>&1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/fast-debt-diagnostic.txt
+          git diff --cached --quiet || { git commit -m "Record fast debt forgiveness regression diagnostics"; git push; }
