@@ -3,12 +3,9 @@ EXTRA_SLOT_ADD PASSED {'student_id': '2999', 'operation': 'add', 'class_number':
 EXTRA_SLOT_LIST PASSED
 REGISTER_LOGIN PASSED
 DEBUG_STUDENT '2999' <class 'str'> 4 True True
-DEBUG_VALIDATE_SOURCE /home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py
-Traceback (most recent call last):
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/test-admin-repair-postgres.py", line 64, in <module>
-    print('DEBUG_VALIDATE',admin_fund_ops.validate(payload),flush=True)
-                           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
-  File "/home/runner/work/hare-machi-factory/hare-machi-factory/deployment/admin_fund_ops.py", line 49, in validate
-    raise ValueError('正しい学籍番号4桁を入力してください。')
-ValueError: 正しい学籍番号4桁を入力してください。
-TEST_EXIT_CODE:1
+DEBUG_VALIDATE_SOURCE /tmp/admin-repair-pg/admin_fund_ops.py
+DEBUG_VALIDATE {'scope': 'single', 'kind': 'forgive', 'note': 'check', 'student_id': '2999'}
+DEBT_PREVIEW PASSED
+DEBT_APPLY PASSED
+PASS: production PostgreSQL wrapper supports registration ID and debt operations
+TEST_EXIT_CODE:0
