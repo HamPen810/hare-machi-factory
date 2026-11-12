@@ -1,0 +1,67 @@
+name: Fix blocking debt forgiveness with live-balance settlement
+on:
+  push:
+    paths:
+      - .github/workflows/deploy-fast-debt-forgiveness.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d testdb"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build revised current production ZIP
+        run: python deployment/apply-fast-debt-forgiveness.py
+      - name: Extract tested modules
+        run: |
+          mkdir -p /tmp/fast-forgiveness-test /tmp/fast-forgiveness-browser
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for n in ('accounts.py','admin.py','admin_fund_ops.py','admin_forgive_fast.py',
+                        'bank.py','market.py','exact.py','postgres.py','event.py'):
+                  Path('/tmp/fast-forgiveness-test',n).write_bytes(z.read(n))
+              for n in ('static/admin.js','static/admin.html'):
+                  Path('/tmp/fast-forgiveness-browser',n.split('/')[-1]).write_bytes(z.read(n))
+              assert '1042119' not in z.read('admin_forgive_fast.py').decode().split('db.execute(')[1]
+              assert "from admin_forgive_fast import execute" in z.read('admin_fund_ops.py').decode()
+              assert '見積もり後に金額が変わっても' in z.read('static/admin.js').decode()
+          PY
+          node --check /tmp/fast-forgiveness-browser/admin.js
+      - name: Regression tests for stale balance, deposits and batch transfers
+        env:
+          PRODUCTION_MODULE_DIR: /tmp/fast-forgiveness-test
+        run: |
+          python deployment/test-fast-debt-forgiveness.py
+          python deployment/test-debt-overdraft-clearing.py
+          python deployment/test-admin-debt-bulk.py
+          python deployment/test-extra-student-slots.py
+      - name: Test on real PostgreSQL and verify unrelated-player locks do not block
+        run: |
+          pip install 'psycopg[binary]' psycopg-pool
+          PG_TEST_DSN=postgresql://tester:tester@127.0.0.1:5432/testdb \
+            PG_PRODUCTION_DIR=/tmp/fast-forgiveness-test \
+            PRODUCTION_MODULE_DIR=/tmp/fast-forgiveness-test \
+            python deployment/test-admin-repair-postgres.py
+      - name: Publish validated production archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Avoid global debt forgiveness lock and settle latest cash"; git push; }
