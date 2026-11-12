@@ -1,0 +1,14 @@
+/* Rulebook genre navigation - keep existing game styling intact */
+#tp-page-rules .rb-organized { width:100%; min-width:0; }
+#tp-page-rules .rb-tabs { display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding:6px 2px 12px; margin:10px 0 12px; scrollbar-width:thin; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+#tp-page-rules .rb-tab { flex:0 0 auto; min-height:44px; border:1px solid #b5c8b7; background:#fffdf6; color:#31544c; padding:10px 15px; border-radius:999px; font:inherit; font-weight:800; font-size:14px; cursor:pointer; white-space:nowrap; }
+#tp-page-rules .rb-tab[aria-selected="true"] { color:#fff; background:#317b68; border-color:#317b68; box-shadow:0 2px 8px #174e3826; }
+#tp-page-rules .rb-tab:focus-visible { outline:3px solid #e3b25e; outline-offset:2px; }
+#tp-page-rules .rb-panel[hidden] { display:none !important; }
+#tp-page-rules .rb-panel { min-width:0; }
+#tp-page-rules .rb-description { font-size:13px; color:#526c66; margin:0 0 12px; font-weight:700; line-height:1.5; }
+#tp-page-rules .rb-panel details { background:#fffdf9; border:1px solid #e1e5dd; border-radius:13px; margin:0 0 11px; padding:0 14px; box-shadow:0 2px 7px #1a51320d; }
+#tp-page-rules .rb-panel summary { padding:14px 0; line-height:1.55; font-size:15px; }
+#tp-page-rules .rb-panel details[open] summary { border-bottom:1px solid #e8eae3; margin-bottom:10px; }
+#tp-page-rules .rb-panel details p { color:#2c3c36; font-size:14px; line-height:1.9; margin:0 0 14px; overflow-wrap:anywhere; }
+@media(max-width:480px) { #tp-page-rules .rb-tab { font-size:13px; padding:10px 13px; } #tp-page-rules .rb-panel details { padding:0 12px; } #tp-page-rules .rb-panel details p { font-size:14px; } }
