@@ -26,9 +26,9 @@ jobs:
                   Path('/tmp/clear-debt-diagnostic',name).write_bytes(z.read(name))
               Path('/tmp/clear-debt-admin.js').write_bytes(z.read('static/admin.js'))
           PY
-            PYTHONPATH=/tmp/clear-debt-diagnostic python deployment/test-debt-overdraft-clearing.py
+            PRODUCTION_MODULE_DIR=/tmp/clear-debt-diagnostic PYTHONPATH=/tmp/clear-debt-diagnostic python deployment/test-debt-overdraft-clearing.py
             echo "DEBT_TEST_EXIT:$?"
-            PYTHONPATH=/tmp/clear-debt-diagnostic python deployment/test-admin-debt-bulk.py
+            PRODUCTION_MODULE_DIR=/tmp/clear-debt-diagnostic PYTHONPATH=/tmp/clear-debt-diagnostic python deployment/test-admin-debt-bulk.py
             echo "BULK_TEST_EXIT:$?"
             node --check /tmp/clear-debt-admin.js
             echo "JS_EXIT:$?"
