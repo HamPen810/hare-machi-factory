@@ -13,6 +13,8 @@ with ZipFile(archive) as z:
     entries=[(i,z.read(i.filename)) for i in z.infolist()]
     comment=z.comment
 files={i.filename:data for i,data in entries}
+# Preserve semantics while normalizing legacy CRLF admin.py anchors.
+files['admin.py']=files['admin.py'].replace(b'\r\n',b'\n')
 def replace(name,old,new):
     s=files[name].decode('utf-8')
     if s.count(old)!=1:raise RuntimeError(f'Unexpected {name} anchor: {s.count(old)} / {old[:95]!r}')
