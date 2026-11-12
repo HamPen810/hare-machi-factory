@@ -57,7 +57,7 @@ change('server.py',
                 # The read-only endpoints below never mutate game state.
                 # They may release their DB connection before serializing a
                 # large HTTP reply; all other paths retain normal lifecycle.
-                if a.postgres and not write and read_only:
+                if a.postgres and not write and (read_only or self.path=='/api/factory'):
                     self._read_response_db=a.db
                 now=clock() if clock else int(time.time()*1000)""")
 for name in ('server.py','postgres.py'):
