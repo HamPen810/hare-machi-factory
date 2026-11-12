@@ -1,0 +1,32 @@
+name: Fix rulebook tabs not loading
+on:
+  push:
+    paths:
+      - .github/workflows/fix-rulebook-inline.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inline-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Validate both rulebook scripts
+        run: |
+          node --check deployment/rulebook-tabs.js
+          node --check deployment/rulebook-custom-tabs.js
+      - name: Inline rulebook CSS and JS in existing game HTML
+        run: python deployment/inline-rulebook.py
+      - name: Commit ZIP for Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Fix missing genre tabs by embedding rulebook assets"
+            git push
+          fi
