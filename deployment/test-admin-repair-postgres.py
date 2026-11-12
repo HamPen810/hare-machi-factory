@@ -1,5 +1,8 @@
 """PostgreSQL regression for admin extra registration IDs and debt cancellation."""
 import os,sys
+# Always import the extracted *production ZIP* code, not the checked-in
+# deployment/ source templates. The two versions can differ after patches.
+sys.path.insert(0,os.environ.get('PG_PRODUCTION_DIR','/tmp/admin-repair-pg'))
 from psycopg_pool import ConnectionPool
 from psycopg.rows import tuple_row
 from postgres import row_factory
