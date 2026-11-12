@@ -42,18 +42,20 @@ substitute('admin.py',
 
 # The table must exist before normal player statistics are queried, even
 # if an administrator has never used fund adjustment before.
-substitute('admin.py',
-"""            self.db.execute('CREATE TABLE IF NOT EXISTS site_rulebook(id INTEGER PRIMARY KEY, body TEXT NOT NULL)')
-""",
-"""            self.db.execute('CREATE TABLE IF NOT EXISTS site_rulebook(id INTEGER PRIMARY KEY, body TEXT NOT NULL)')
-            self.db.execute(\"\"\"CREATE TABLE IF NOT EXISTS admin_fund_transfers(
+# Initialize the ledger on boot, even before the first admin operation.
+# Legacy admin.py uses CRLF in its original initialize() method.
+admin_source=files['admin.py'].decode('utf-8')
+matching=[line for line in admin_source.splitlines(keepends=True)
+          if "self.db.execute('CREATE TABLE IF NOT EXISTS site_rulebook" in line]
+if len(matching)!=1:raise RuntimeError('Cannot find admin initialize ledger location')
+ledger_sql='''            self.db.execute("""CREATE TABLE IF NOT EXISTS admin_fund_transfers(
                 key TEXT PRIMARY KEY,
                 player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
                 student_id TEXT NOT NULL, name TEXT NOT NULL,
                 kind TEXT NOT NULL, amount NUMERIC NOT NULL,
                 before_cash NUMERIC NOT NULL, after_cash NUMERIC NOT NULL,
-                note TEXT NOT NULL, created_at BIGINT NOT NULL)\"\"\")
-""")
+                note TEXT NOT NULL, created_at BIGINT NOT NULL)""")\n'''
+files['admin.py']=admin_source.replace(matching[0],matching[0]+ledger_sql).encode('utf-8')
 
 # Apply collection expense to net-profit ranking in both SQLite and PostgreSQL.
 # Tax ledger and grants remain excluded.
