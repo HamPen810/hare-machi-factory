@@ -89,7 +89,7 @@ assert len(history(db))==2
 assert len(db.execute('SELECT * FROM admin_fund_transfers').fetchall())==2
 
 # Legacy debt without matching bank_contract is also forgiven.
-db.execute("UPDATE bank_accounts SET debt=123 WHERE player='r'")
+db.execute("INSERT INTO bank_accounts(player,debt) VALUES('r',123)")
 db.commit()
 single={'scope':'single','kind':'forgive','student_id':'2103','note':'legacy'}
 v=preview(single)
