@@ -1,0 +1,69 @@
+name: Tune production connection pools and client disconnect handling
+on:
+  push:
+    paths:
+      - .github/workflows/tune-production-pool.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tune-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch current deployment ZIP safely
+        shell: bash
+        run: |
+          python - <<'PY'
+          import ast, io, zipfile
+          from pathlib import Path
+          archive=Path('hare-machi-render.zip')
+          with zipfile.ZipFile(archive) as source:
+              pg=source.read('postgres.py').decode('utf-8').replace('\r\n','\n')
+              server=source.read('server.py').decode('utf-8').replace('\r\n','\n')
+          def replace_once(text,old,new):
+              if text.count(old)!=1:
+                  raise RuntimeError('Unexpected source version: '+old[:80])
+              return text.replace(old,new)
+          pg=replace_once(pg,'from pathlib import Path\n','from pathlib import Path\nimport os\n')
+          pg=replace_once(pg,
+              'url, min_size=0, max_size=2, timeout=20, max_idle=20, open=True,',
+              'url, min_size=0, max_size=(8 if os.environ.get("RENDER_SERVICE_NAME") == "hare-machi-factory-sg" else 1),\n        timeout=12, max_idle=15, open=True,')
+          server=replace_once(server,
+              'if status!=304:self.wfile.write(data)',
+              '''if status!=304:
+                try:
+                    self.wfile.write(data)
+                except (BrokenPipeError, ConnectionResetError):
+                    # Client closed the connection; no game transaction is lost.
+                    self.close_connection=True''')
+          for name,text in [('postgres.py',pg),('server.py',server)]:
+              ast.parse(text,filename=name)
+          output=io.BytesIO()
+          with zipfile.ZipFile(archive) as source, zipfile.ZipFile(output,'w') as target:
+              target.comment=source.comment
+              for member in source.infolist():
+                  if member.filename=='postgres.py':data=pg.encode('utf-8')
+                  elif member.filename=='server.py':data=server.encode('utf-8')
+                  else:data=source.read(member)
+                  target.writestr(member,data)
+          with zipfile.ZipFile(io.BytesIO(output.getvalue())) as check:
+              assert check.testzip() is None
+              assert check.read('postgres.py') == pg.encode('utf-8')
+              assert check.read('server.py') == server.encode('utf-8')
+          archive.write_bytes(output.getvalue())
+          PY
+          mkdir -p /tmp/verify-app
+          python -m zipfile -e hare-machi-render.zip /tmp/verify-app
+          python -m compileall -q /tmp/verify-app
+          node --check /tmp/verify-app/static/app.js
+      - name: Publish ZIP change for Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet && exit 0
+          git commit -m "Allocate database sessions to main game; handle cancelled HTTP responses"
+          git push
