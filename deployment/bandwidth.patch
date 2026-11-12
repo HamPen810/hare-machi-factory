@@ -1,0 +1,118 @@
+--- a/server.py
++++ b/server.py
+@@ -2,6 +2,8 @@
+ from exact import wire
+ import bank
+ import argparse
++import gzip
++import hashlib
+ import json
+ import logging
+ import sqlite3
+@@ -10,6 +12,7 @@
+ import time
+ from http.cookies import SimpleCookie
+ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++from functools import lru_cache
+ from pathlib import Path
+ from accounts import Accounts
+ from market import Game
+@@ -19,6 +22,8 @@
+ from inventory_cluster import InventoryCluster
+ 
+ STATIC=Path(__file__).with_name('static')
++STATIC_ASSET_CACHE='public, max-age=3600, must-revalidate'
++STATIC_CODE_CACHE='public, no-cache'
+ MAINTENANCE=os.environ.get('HARE_FACTORY_MAINTENANCE','1')!='0'
+ API_PATHS={'/api/login','/api/register','/api/logout','/api/name','/api/action','/api/snapshot',
+            '/api/factory','/api/ranks','/api/data','/api/market','/api/market-quotes','/api/bank'}
+@@ -42,16 +47,58 @@
+                     account.db.close()
+             return settings_cache
+ 
++    @lru_cache(maxsize=40)
++    def static_etag(relative_path, mtime_ns, size):
++        """ETag is content-based; mtime and size invalidate this process's cache."""
++        data=(STATIC/relative_path).read_bytes()
++        return 'W/"'+hashlib.sha256(data).hexdigest()+'"'
++
+     class Handler(BaseHTTPRequestHandler):
+         def log_message(self,*args): pass
+-        def reply(self,status,body,cookie=None,kind='application/json; charset=utf-8'):
++        def reply(self,status,body,cookie=None,kind='application/json; charset=utf-8',
++                  cache_control='no-store',etag=None):
+             data=json.dumps(wire(body),ensure_ascii=False).encode() if kind.startswith('application/json') else body
++            compressed=False
++            compressible=kind.startswith(('application/json','text/'))
++            if status==200 and compressible and len(data)>=1024:
++                accept=self.headers.get('Accept-Encoding','')
++                for option in accept.split(','):
++                    parts=[part.strip().lower() for part in option.split(';')]
++                    if parts[0]!='gzip':
++                        continue
++                    quality=1.0
++                    for part in parts[1:]:
++                        if part.startswith('q='):
++                            try:quality=float(part[2:])
++                            except ValueError:quality=0.0
++                    if not quality>0:
++                        break
++                    zipped=gzip.compress(data,compresslevel=5,mtime=0)
++                    if len(zipped)<len(data):
++                        data=zipped
++                        compressed=True
++                    break
+             self.send_response(status)
+-            self.send_header('Content-Type',kind); self.send_header('Content-Length',str(len(data)))
+-            self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff')
++            if status!=304:
++                self.send_header('Content-Type',kind)
++                self.send_header('Content-Length',str(len(data)))
++            self.send_header('Cache-Control',cache_control)
++            if etag:self.send_header('ETag',etag)
++            if compressible:self.send_header('Vary','Accept-Encoding')
++            if compressed:self.send_header('Content-Encoding','gzip')
++            self.send_header('X-Content-Type-Options','nosniff')
+             self.send_header('Content-Security-Policy',"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.open-meteo.com; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+-            if cookie: self.send_header('Set-Cookie',cookie+('; Secure' if public_origin else ''))
+-            self.end_headers(); self.wfile.write(data)
++            if cookie:self.send_header('Set-Cookie',cookie+('; Secure' if public_origin else ''))
++            self.end_headers()
++            if status!=304:self.wfile.write(data)
++
++        def static_reply(self,relative_path,kind,cache_control):
++            file=STATIC/relative_path
++            stat=file.stat()
++            etag=static_etag(relative_path,stat.st_mtime_ns,stat.st_size)
++            if self.headers.get('If-None-Match','')==etag:
++                return self.reply(304,b'',kind=kind,cache_control=cache_control,etag=etag)
++            return self.reply(200,file.read_bytes(),kind=kind,cache_control=cache_control,etag=etag)
+         def process(self,write):
+             started=time.monotonic()
+             try:
+@@ -83,16 +130,19 @@
+                     return self.reply(503,{'maintenance':True,'error':'サーバーメンテナンス中です。再開までお待ちください。'})
+             if not write and self.path == '/api/weather':return self.reply(200,forecast())
+             if not write and self.path == '/fonts/Yomogi-Regular.ttf':
+-                return self.reply(200,(STATIC/'fonts'/'Yomogi-Regular.ttf').read_bytes(),kind='font/ttf')
++                return self.static_reply('fonts/Yomogi-Regular.ttf','font/ttf',STATIC_ASSET_CACHE)
+             assets={'/assets/teramoto-bozu.png':'teramoto-bozu.png','/assets/mikka-bozu.png':'mikka-bozu.png','/assets/koyama-bozu.png':'koyama-bozu.png','/assets/yamada-bozu.png':'yamada-bozu.png','/assets/sea-yokai.png':'sea-yokai.png','/assets/shisa-doll.png':'shisa-doll.png','/assets/island-background.png':'island-background.png','/assets/teru-painted.png':'teru-painted.png','/assets/shisa-painted.png':'shisa-painted.png'}
+             if not write and self.path in assets:
+-                return self.reply(200,(STATIC/'assets'/assets[self.path]).read_bytes(),kind='image/png')
++                return self.static_reply('assets/'+assets[self.path],'image/png',STATIC_ASSET_CACHE)
+             if not write and self.path in ('/','/weather.js','/app.js','/numbers.js','/polish.css','/island.css','/tabs.js','/polish.js','/admin','/admin/','/admin.js'):
+                 file={'/weather.js':'weather.js','/':'index.html','/app.js':'app.js','/numbers.js':'numbers.js','/polish.css':'polish.css','/island.css':'island.css','/tabs.js':'tabs.js','/polish.js':'polish.js','/admin':'admin.html','/admin/':'admin.html','/admin.js':'admin.js'}[self.path]
+-                payload=(STATIC/file).read_bytes()
+-                if file=='index.html' and not settings['maintenance']:
+-                    payload=payload.replace(b'id="maintenance-note"',b'id="maintenance-note" hidden').replace(b'action="/api/login" hidden',b'action="/api/login"')
+-                return self.reply(200,payload,kind='text/html; charset=utf-8' if file.endswith('html') else 'text/css; charset=utf-8' if file.endswith('css') else 'text/javascript; charset=utf-8')
++                kind='text/html; charset=utf-8' if file.endswith('html') else 'text/css; charset=utf-8' if file.endswith('css') else 'text/javascript; charset=utf-8'
++                if file.endswith('html'):
++                    payload=(STATIC/file).read_bytes()
++                    if file=='index.html' and not settings['maintenance']:
++                        payload=payload.replace(b'id="maintenance-note"',b'id="maintenance-note" hidden').replace(b'action="/api/login" hidden',b'action="/api/login"')
++                    return self.reply(200,payload,kind=kind)
++                return self.static_reply(file,kind,STATIC_CODE_CACHE)
+             a=None
+             try:
+                 data={}
