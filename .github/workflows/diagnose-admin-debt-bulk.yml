@@ -1,0 +1,38 @@
+name: Diagnose debt forgiveness and wealth operations
+on:
+  push:
+    paths:
+      - .github/workflows/diagnose-admin-debt-bulk.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record patch and regression diagnostics
+        run: |
+          set +e
+          {
+            python deployment/add-admin-debt-bulk.py
+            echo "PATCH_STATUS:$?"
+            mkdir -p /tmp/debt-bulk-diag
+            python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.py','accounts.py','exact.py','bank.py','market.py','event.py','admin_fund_ops.py'):
+                  Path('/tmp/debt-bulk-diag',name).write_bytes(z.read(name))
+              Path('/tmp/admin-debt-bulk-diag.js').write_bytes(z.read('static/admin.js'))
+          PY
+            PYTHONPATH=/tmp/debt-bulk-diag python deployment/test-admin-debt-bulk.py
+            echo "TEST_STATUS:$?"
+            node --check /tmp/admin-debt-bulk-diag.js
+            echo "JS_STATUS:$?"
+          } >deployment/debt-bulk-diagnostic.txt 2>&1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/debt-bulk-diagnostic.txt
+          git commit -m "Record debt and bulk operations diagnostics"
+          git push
