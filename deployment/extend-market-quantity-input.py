@@ -104,6 +104,14 @@ new='''                    if isinstance(data.get('quantity'),str):
                                     data['quantity']=int(digits[:cut])
 '''
 replace_once('server.py',old,new)
+# The Android decimal/numeric keyboard has no 'e' key. Both shipment and
+# market purchase quantity inputs must request a normal text keyboard.
+replace_once('static/index.html',
+    'id="market-buy-quantity" type="text" inputmode="decimal"',
+    'id="market-buy-quantity" type="text" inputmode="text"')
+replace_once('static/index.html',
+    'data-ui="quantity" type="text" inputmode="decimal"',
+    'data-ui="quantity" type="text" inputmode="text"')
 fd,tmp=tempfile.mkstemp(suffix='.zip',dir='.')
 os.close(fd)
 try:
