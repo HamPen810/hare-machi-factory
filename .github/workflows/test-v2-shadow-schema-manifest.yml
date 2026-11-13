@@ -1,0 +1,25 @@
+name: Validate V2 staging shadow-column manifest
+on:
+  push:
+    paths:
+      - deployment/v2_shadow_schema_manifest.py
+      - deployment/test_v2_shadow_schema_manifest.py
+      - .github/workflows/test-v2-shadow-schema-manifest.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run migration guard tests
+        run: |
+          python -m py_compile deployment/v2_shadow_schema_manifest.py
+          cd deployment
+          python -m unittest -v test_v2_shadow_schema_manifest.py
+      - name: Generate SQL for REVIEW ONLY, do not connect to any database
+        run: |
+          python deployment/v2_shadow_schema_manifest.py > /tmp/v2-staging-only.sql
+          grep -q 'ADD COLUMN IF NOT EXISTS "cash_v2" TEXT' /tmp/v2-staging-only.sql
+          echo "Staging-only SQL generated without any DB connection"
