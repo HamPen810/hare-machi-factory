@@ -1,0 +1,80 @@
+name: Allow market overdrafts and remove artificial caps
+on:
+  push:
+    paths:
+      - .github/workflows/market-overdraft-remove-artificial-limits.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch current production ZIP
+        run: python deployment/market-overdraft-remove-artificial-limits.py
+      - name: Validate overdrafts and enormous exact amounts
+        run: |
+          mkdir -p /tmp/hare-market-overdraft/static
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import ast
+          root=Path('/tmp/hare-market-overdraft')
+          with ZipFile('hare-machi-render.zip') as z:
+              for f in ('market.py','server.py','static/app.js','static/numbers.js'):
+                  (root/f).write_bytes(z.read(f))
+          market=(root/'market.py').read_text()
+          server=(root/'server.py').read_text()
+          browser=(root/'static/app.js').read_text()
+          numbers=(root/'static/numbers.js').read_text()
+          assert "UPDATE factories SET cash=bsub(cash,?) WHERE player=?" in market
+          assert "AND bge(cash,?)" not in market[market.index('def _buy_market('):market.index('def _reserve_shipment(')]
+          assert 'MARKET_MAX_TOTAL_DIGITS=131072' in market
+          assert 'MARKET_MAX_TOTAL_DIGITS=50000' not in market
+          assert 'MAX_MARKET_TOTAL_DIGITS=50000' not in browser
+          assert 'MAX_INTEGER_DIGITS = 131072' in numbers
+          assert 'if len(digits)+shift>131072:' in server
+          assert "len(str(data['price']*data['quantity']))>50000" not in server
+          for f in ('market.py','server.py'):
+              ast.parse((root/f).read_text())
+          # Isolated reference calculation of the total-limit helper.
+          tree=ast.parse(market)
+          wanted=[]
+          for node in tree.body:
+              if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id in ('MARKET_MAX_TOTAL_BITS','MARKET_MAX_TOTAL_DIGITS') for t in node.targets):wanted.append(node)
+              if isinstance(node,ast.FunctionDef) and node.name=='ensure_market_total':wanted.append(node)
+          scope={}
+          exec(compile(ast.Module(body=wanted,type_ignores=[]),'<exact-market>', 'exec'),scope)
+          guard=scope['ensure_market_total']
+          for q,price in ((10**4000,99999),(10**50000,10**50000),(10**100000,10**10000)):
+              guard(q,price)
+          for q,price in ((10**131072,1),(10**70000,10**70000)):
+              try:guard(q,price)
+              except ValueError:pass
+              else:raise AssertionError('Accepted value beyond physical numeric storage')
+          print('Overdraft and exact huge total validations passed')
+          PY
+          python -m py_compile /tmp/hare-market-overdraft/market.py /tmp/hare-market-overdraft/server.py
+          node --check /tmp/hare-market-overdraft/static/app.js
+          node --check /tmp/hare-market-overdraft/static/numbers.js
+          node - <<'JS'
+          global.window={};
+          require('/tmp/hare-market-overdraft/static/numbers.js');
+          const parse=window.TeruNumber.parseWhole;
+          const q=parse('1e100000'),p=parse('1e1000');
+          if(q===null||p===null||(q*p)!==10n**101000n)throw Error('Failed large exact multiplication');
+          if(parse('1e131072')!==null)throw Error('Invalid physical numeric range');
+          console.log('BigInt large exact parsing checks passed')
+          JS
+      - name: Commit verified production ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Allow market purchases into negative cash and remove artificial amount cap"
+            git push
+          fi
