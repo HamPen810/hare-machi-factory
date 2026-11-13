@@ -36,7 +36,7 @@ jobs:
           asset=scope['asset_exponential_tax_due']
           multiplier=scope['asset_exponent_multiplier']
           policy={'threshold':'0','step':'10','base_bps':10000}
-          for value,expected in [(0,0),(1,1),(10,10),(11,110),(20,200),(110,1010),(111,1110)]:
+          for value,expected in [(0,0),(1,1),(10,10),(11,20),(20,110),(110,1010),(111,1110)]:
               assert asset(value,policy)==expected,(value,asset(value,policy),expected)
           for n in (10,20,999,1000,1004,1005,1999,2000,2001,2002,10001):
               expected = n//10 if n<1000 else 100+(n-1000)//5 if n<2000 else 300+(n-2000)//2
