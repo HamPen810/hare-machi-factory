@@ -101,6 +101,53 @@ class PostgresShadowLab(unittest.TestCase):
             exact_buy(self.db,'reused-key-0001','buyer','seller','white','2','20')
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM trade_receipts').fetchone()[0],1)
 
+    def test_staging_only_shadow_ddl_on_synthetic_production_shape(self):
+        from v2_shadow_schema_manifest import ECONOMIC_COLUMNS, generate_staging_sql
+        # Every table here is SYNTHETIC, in a local disposable database.
+        # Roll back all generated DDL at the end of the test.
+        with self.db.transaction():
+            self.db.execute('CREATE SCHEMA IF NOT EXISTS hare_factory')
+            for table,columns in ECONOMIC_COLUMNS.items():
+                columns_sql=', '.join('"'+col+'" NUMERIC' for col in columns)
+                self.db.execute(
+                    'CREATE TABLE hare_factory."'+table+'" ("__id" INT PRIMARY KEY, '
+                    +columns_sql+')')
+            ddl=generate_staging_sql()
+            for sql in ddl.split(';'):
+                sql='\n'.join(line for line in sql.splitlines()
+                               if not line.lstrip().startswith('--')).strip()
+                if sql and sql not in ('BEGIN','COMMIT'):
+                    self.db.execute(sql)
+            self.db.execute(
+                "INSERT INTO hare_factory.factories (__id,cash,cash_v2) VALUES (1,100,'S1:100@0')")
+            before=self.db.execute(
+                "SELECT cash,cash_v2 FROM hare_factory.factories WHERE __id=1"
+            ).fetchone()
+            for table,columns in ECONOMIC_COLUMNS.items():
+                for column in columns:
+                    row=self.db.execute(
+                        "SELECT data_type FROM information_schema.columns "
+                        "WHERE table_schema='hare_factory' AND table_name=%s AND column_name=%s",
+                        (table,column)).fetchone()
+                    self.assertEqual(row,('numeric',))
+                    row=self.db.execute(
+                        "SELECT data_type FROM information_schema.columns "
+                        "WHERE table_schema='hare_factory' AND table_name=%s AND column_name=%s",
+                        (table,column+'_v2')).fetchone()
+                    self.assertEqual(row,('text',))
+            self.assertEqual(before,(100,'S1:100@0'))
+            # Re-running ADD COLUMN IF NOT EXISTS is safe.
+            for sql in ddl.split(';'):
+                sql='\n'.join(line for line in sql.splitlines()
+                               if not line.lstrip().startswith('--')).strip()
+                if sql and sql not in ('BEGIN','COMMIT'):
+                    self.db.execute(sql)
+            self.assertEqual(self.db.execute(
+                "SELECT cash,cash_v2 FROM hare_factory.factories WHERE __id=1"
+            ).fetchone(),before)
+            # For this isolated schema fixture only; no production DDL.
+            self.db.execute('DROP SCHEMA hare_factory CASCADE')
+
     def test_refuses_any_production_database_uri(self):
         with self.assertRaisesRegex(RuntimeError,'Refusing'):
             assert_disposable_connection('postgresql://u:p@db.xnqvygduplopkkhnrbis.supabase.co/postgres')
