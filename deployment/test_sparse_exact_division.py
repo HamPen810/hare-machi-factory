@@ -18,7 +18,7 @@ class SparseExactDivisionTests(unittest.TestCase):
     def test_tax_can_remain_compact_beyond_numeric(self):
         n=S.parse('1.25e7600')
         tax=mul_ratio_floor(n,1250,10000)
-        self.assertEqual(tax.serialize(),'S1:156250@7593')
+        self.assertEqual(tax.serialize(),'S1:156250@7594')
         # 1.25e7600 * (12.5%) = 1.5625e7599
         self.assertEqual(tax.compare(S.parse('1.5625e7599')),0)
         self.assertLess(len(tax.serialize()),35)
