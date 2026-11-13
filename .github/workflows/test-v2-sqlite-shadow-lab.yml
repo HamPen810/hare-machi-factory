@@ -1,0 +1,22 @@
+name: Test isolated SQL migration and giant-number settlement
+on:
+  push:
+    paths:
+      - deployment/v2_sqlite_shadow_lab.py
+      - deployment/test_v2_sqlite_shadow_lab.py
+      - deployment/sparse_exact_v1.py
+      - deployment/sparse_exact_division.py
+      - .github/workflows/test-v2-sqlite-shadow-lab.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify isolated SQL and number modules
+        run: |
+          python -m py_compile deployment/v2_sqlite_shadow_lab.py deployment/sparse_exact_v1.py deployment/sparse_exact_division.py
+          cd deployment
+          python -m unittest -v test_sparse_exact_v1.py test_sparse_exact_division.py test_economy_v2_reference.py test_v2_sqlite_shadow_lab.py
