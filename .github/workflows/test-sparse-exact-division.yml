@@ -1,0 +1,24 @@
+name: Verify exact huge-number division and accounting
+on:
+  push:
+    paths:
+      - deployment/sparse_exact_v1.py
+      - deployment/sparse_exact_division.py
+      - deployment/test_sparse_exact_v1.py
+      - deployment/test_sparse_exact_division.py
+      - .github/workflows/test-sparse-exact-division.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated exact-number modules
+        run: |
+          python -m py_compile deployment/sparse_exact_v1.py deployment/sparse_exact_division.py
+      - name: Test exact integer division, taxes, negative balances and conservation
+        run: |
+          cd deployment
+          python -m unittest -v test_sparse_exact_v1.py test_sparse_exact_division.py
