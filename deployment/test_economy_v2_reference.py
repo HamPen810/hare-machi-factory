@@ -19,7 +19,7 @@ class ReferenceLedgerTests(unittest.TestCase):
         price=S.parse('3e2000000000')
         outcome=m.buy('trade-00000001','buyer','seller','white',count,price)
         self.assertEqual(outcome['gross'].serialize(),'S1:6@3000000000')
-        self.assertEqual(outcome['fee'].compare(S.parse('3e299999999')),0)
+        self.assertEqual(outcome['fee'].compare(S.parse('3e2999999999')),0)
         self.assertEqual(m.accounts['buyer'].cash.sign(),-1)
         self.assertEqual(m.accounts['seller'].stock['white'].compare(S.parse('1e1000000000')),0)
         self.assertEqual(m.total_stock('white').compare(stock_before),0)
