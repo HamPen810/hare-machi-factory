@@ -1,0 +1,58 @@
+name: Fix 2x asset tax brackets to 10x
+on:
+  push:
+    paths:
+      - .github/workflows/fix-asset-tax-double-bands.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch production bundle
+        run: python deployment/fix-asset-tax-double-bands.py
+      - name: Verify tax calculations and admin labeling
+        run: |
+          mkdir -p /tmp/hare-asset-tax-tens
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          p=Path('/tmp/hare-asset-tax-tens/bank.py')
+          with ZipFile('hare-machi-render.zip') as z:
+              p.write_bytes(z.read('bank.py'))
+              html=z.read('static/admin.html').decode()
+              assert '売上課税（従来方式）：区分ごとに税率と幅を2倍にする' in html
+              assert '基本の課税区分の幅と税率が段階ごとに10倍' in html
+          tree=ast.parse(p.read_text())
+          targets=[node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name in ('asset_exponential_tax_due','asset_exponent_multiplier')]
+          assert len(targets)==2
+          scope={}
+          exec(compile(ast.Module(body=targets,type_ignores=[]),'<bank-test>','exec'),scope)
+          asset=scope['asset_exponential_tax_due']
+          multiplier=scope['asset_exponent_multiplier']
+          policy={'threshold':'0','step':'10','base_bps':10000}
+          for value,expected in [(0,0),(1,1),(10,10),(11,110),(20,200),(110,1010),(111,1110)]:
+              assert asset(value,policy)==expected,(value,asset(value,policy),expected)
+          for n in (10,20,999,1000,1004,1005,1999,2000,2001,2002,10001):
+              expected = n//10 if n<1000 else 100+(n-1000)//5 if n<2000 else 300+(n-2000)//2
+              assert multiplier(10**n)==10**expected,n
+          assert 'asset_exponential_tax_due(max(0,value),policy)' in p.read_text()
+          assert "row['cash'] + row['deposit']" in p.read_text()
+          assert "FROM stock" in p.read_text() and "FROM listings" in p.read_text()
+          print('10x combined-asset taxation and 2x legacy sales-tax distinction pass')
+          PY
+          python -m py_compile /tmp/hare-asset-tax-tens/bank.py
+      - name: Commit tested production ZIP for Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Make combined asset tax bands grow by 10x and clarify admin controls"
+            git push
+          fi
