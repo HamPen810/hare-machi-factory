@@ -1,0 +1,46 @@
+name: Enable overdraft purchases in market dialog
+on:
+  push:
+    paths:
+      - .github/workflows/market-overdraft-buy-button.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch browser in deployed archive
+        run: python deployment/market-overdraft-buy-button.py
+      - name: Test buyer UI and server allow negative cash
+        run: |
+          mkdir -p /tmp/hare-overdraft-ui/static
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              js=z.read('static/app.js').decode()
+              py=z.read('market.py').decode()
+              Path('/tmp/hare-overdraft-ui/static/app.js').write_text(js)
+          assert 'buySubmit.disabled=buying||!snapshot||quantity<1n||quantity>available;' in js
+          assert '||total>big(snapshot.factory.cash)' not in js
+          body=py.split('def _buy_market(',1)[1].split('def _reserve_shipment(',1)[0]
+          assert 'AND bge(cash,?)' not in body
+          assert "UPDATE factories SET cash=bsub(cash,?) WHERE player=?" in body
+          assert 'ensure_market_total(quantity,average)' in body
+          assert 'MARKET_MAX_TOTAL_DIGITS=131072' in py
+          print('UI and server overdraft checks passed')
+          PY
+          node --check /tmp/hare-overdraft-ui/static/app.js
+      - name: Commit tested production ZIP for Render auto deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Enable overdraft market purchase button"
+            git push
+          fi
