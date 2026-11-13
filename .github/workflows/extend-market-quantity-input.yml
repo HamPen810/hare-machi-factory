@@ -30,6 +30,10 @@ jobs:
               assert "const amount=parseWhole(request.quantity)" in s
               assert "const value=parseWhole(exact)??0n;" in s
               assert "kind:'buy_market'" in s
+              html=z.read('static/index.html').decode()
+              assert 'id="market-buy-quantity" type="text" inputmode="text"' in html
+              assert 'data-ui="quantity" type="text" inputmode="text"' in html
+              assert 'id="market-buy-quantity" type="text" inputmode="decimal"' not in html
           PY
           python -m py_compile /tmp/hare-quantity-check/server.py
           node --check /tmp/hare-quantity-check/static/numbers.js
