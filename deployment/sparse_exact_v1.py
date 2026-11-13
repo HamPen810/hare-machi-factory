@@ -129,6 +129,41 @@ class SparseExact:
         """Sufficient canonical-by-term equality (not complete numeric equality)."""
         return isinstance(other,SparseExact) and self.terms==other.terms
 
+    def sign(self):
+        """Exact sign via decimal carry across sparse exponents.
+
+        For each gap, floor-divide the lower signed carry by 10**gap.
+        Remainders are nonnegative; only whether any remainder survives
+        is needed for final sign when the top carry is exactly zero.
+        Large gaps never require constructing the full power of ten.
+        """
+        if not self.terms:
+            return 0
+        ordered=iter(reversed(self.terms))
+        exponent,carry=next(ordered)
+        nonzero_remainder=False
+        for next_exp,coeff in ordered:
+            gap=next_exp-exponent
+            if gap>len(str(abs(carry))):
+                quotient=-1 if carry<0 else 0
+                remainder_exists=carry!=0
+            else:
+                quotient,remainder=divmod(carry,10**gap)
+                remainder_exists=remainder!=0
+            nonzero_remainder |= remainder_exists
+            carry=quotient+coeff
+            exponent=next_exp
+        return (carry>0)-(carry<0) if carry else int(nonzero_remainder)
+
+    def compare(self,other):
+        """Exact signed comparison, even for astronomical exponents."""
+        if not isinstance(other,SparseExact):
+            raise TypeError('Can compare only exact sparse values')
+        return (self-other).sign()
+
+    def is_zero(self):
+        return self.sign()==0
+
     def is_syntactic_zero(self):
-        """Cannot prove sign for arbitrary sparse representations."""
+        """Fast sufficient check for cancellation after term merging."""
         return not self.terms
