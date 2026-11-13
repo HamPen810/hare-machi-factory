@@ -1,0 +1,61 @@
+name: Enable scientific notation and large exact quantities for market
+on:
+  push:
+    paths:
+      - .github/workflows/extend-market-quantity-input.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch existing production ZIP
+        run: python deployment/extend-market-quantity-input.py
+      - name: Validate server and browser behavior
+        run: |
+          mkdir -p /tmp/hare-quantity-check
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              for f in ('server.py','static/app.js','static/numbers.js','static/index.html'):
+                  p=Path('/tmp/hare-quantity-check')/f
+                  p.parent.mkdir(parents=True,exist_ok=True)
+                  p.write_bytes(z.read(f))
+              s=z.read('static/app.js').decode()
+              assert "const amount=parseWhole(request.quantity)" in s
+              assert "const value=parseWhole(exact)??0n;" in s
+              assert "kind:'buy_market'" in s
+          PY
+          python -m py_compile /tmp/hare-quantity-check/server.py
+          node --check /tmp/hare-quantity-check/static/numbers.js
+          node --check /tmp/hare-quantity-check/static/app.js
+          node - <<'JS'
+          global.window={};
+          require('/tmp/hare-quantity-check/static/numbers.js');
+          const parse=window.TeruNumber.parseWhole;
+          const cases=[
+            ['1e6','1000000'], ['2.5e4','25000'], ['1e10001','1'+'0'.repeat(10001)],
+            ['5e99999','5'+'0'.repeat(99999)],['1e100000',null],
+            ['1e99999999',null], ['1.2e1','12'],['1.23e1',null],
+            ['10e-1','1'],['1e-1',null]
+          ];
+          for(const [input,want] of cases){
+            const result=parse(input);
+            if((result===null?null:result.toString())!==want)throw Error('Failed '+input);
+          }
+          console.log('Exact scientific integer parsing checks passed.');
+          JS
+      - name: Publish tested ZIP for Render auto deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Accept scientific notation and large market and shipment counts"
+            git push
+          fi
