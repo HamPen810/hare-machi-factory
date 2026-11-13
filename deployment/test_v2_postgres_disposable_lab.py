@@ -148,6 +148,21 @@ class PostgresShadowLab(unittest.TestCase):
             # For this isolated schema fixture only; no production DDL.
             self.db.execute('DROP SCHEMA hare_factory CASCADE')
 
+    def test_exact_numeric_text_backfill_on_postgres17(self):
+        from v2_numeric_lossless_backfill import numeric_text_to_sparse
+        cases=['1.25e7600', '-1e10000', '9'*131072, '1000.000']
+        for original in cases:
+            with self.subTest(length=len(original)):
+                # A real NUMERIC roundtrip, not Python integer emulation.
+                stored=self.db.execute(
+                    'SELECT (%s::numeric)::text',(original,)).fetchone()[0]
+                exact=numeric_text_to_sparse(stored)
+                self.assertEqual(
+                    exact.compare(numeric_text_to_sparse(original)),0)
+                self.assertEqual(
+                    S.deserialize(exact.serialize()).compare(exact),0)
+                self.assertLessEqual(len(exact.terms),2048)
+
     def test_refuses_any_production_database_uri(self):
         with self.assertRaisesRegex(RuntimeError,'Refusing'):
             assert_disposable_connection('postgresql://u:p@db.xnqvygduplopkkhnrbis.supabase.co/postgres')
