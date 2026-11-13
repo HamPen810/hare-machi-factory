@@ -1,0 +1,66 @@
+name: Fix e4737 shipment validation and exact balance display
+on:
+  push:
+    paths:
+      - .github/workflows/fix-market-huge-shipments-cash-visibility.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch latest production bundle
+        run: python deployment/fix-market-huge-shipments-cash-visibility.py
+      - name: Validate server and browser for e4737 quantities
+        run: |
+          mkdir -p /tmp/hare-large-shipment/static
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import ast
+          root=Path('/tmp/hare-large-shipment')
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('static/numbers.js','static/app.js','server.py'):
+                  p=root/name;p.parent.mkdir(parents=True,exist_ok=True)
+                  p.write_bytes(z.read(name))
+          server=(root/'server.py').read_text()
+          js=(root/'static/app.js').read_text()
+          numbers=(root/'static/numbers.js').read_text()
+          assert "(262144 if self.path=='/api/action'" in server
+          assert "if len(value)>131072:" in server
+          assert "if (source.length > 131072) return null;" in numbers
+          assert 'ui(\\'cash\\').addEventListener(\\'click\\',showExactCash)' in js
+          assert "request.quantity=quantityText(ui('quantity')).trim()" in js
+          assert "const amount=parseWhole(request.quantity)" in js
+          assert "request.quantity=String(amount)" not in js
+          ast.parse(server)
+          print('Request length, exact quantity preservation and full cash viewer confirmed')
+          PY
+          python -m py_compile /tmp/hare-large-shipment/server.py
+          node --check /tmp/hare-large-shipment/static/app.js
+          node --check /tmp/hare-large-shipment/static/numbers.js
+          node - <<'JS'
+          global.window={};
+          require('/tmp/hare-large-shipment/static/numbers.js');
+          const parse=window.TeruNumber.parseWhole;
+          const exact=26813n * 10n**4733n;
+          for(const text of [exact.toString(),'2.6813e+4737','1e3986']){
+             const result=parse(text);
+             if(result===null || result<1n)throw Error('Rejected valid shipment '+text.slice(0,30));
+          }
+          if(parse('1e131072')!==null)throw Error('Accepted an out-of-DB-range integer');
+          console.log('e3986, e4737, full 4738-digit integer and storage boundary passed');
+          JS
+      - name: Publish tested ZIP to Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix huge exact shipments and make cash changes inspectable"
+            git push
+          fi
