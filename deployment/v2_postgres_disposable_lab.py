@@ -53,7 +53,7 @@ def assert_disposable_connection(dsn):
 
 def connect(dsn):
     assert_disposable_connection(dsn)
-    return psycopg.connect(dsn,autocommit=False,connect_timeout=5)
+    return psycopg.connect(dsn,autocommit=True,connect_timeout=5)
 
 
 def initialize(dsn):
