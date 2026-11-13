@@ -39,8 +39,10 @@ change('market.py',
 
 # Only modify the PostgreSQL branch. The SQLite branch remains unchanged.
 change('accounts.py',
-'''accepted_at,settled_at FROM sales WHERE player_id=? ORDER BY settled_at DESC''',(player['id'],))]''',
-'''accepted_at,settled_at FROM sales WHERE player_id=? ORDER BY settled_at DESC LIMIT 60''',(player['id'],))]''')
+'''CASE WHEN sold_quantity=0 THEN NULL ELSE (unit_price-unit_cost)*1.0/unit_price END margin,
+          accepted_at,settled_at FROM sales WHERE player_id=? ORDER BY settled_at DESC''',(player['id'],))]''',
+'''CASE WHEN sold_quantity=0 THEN NULL ELSE (unit_price-unit_cost)*1.0/unit_price END margin,
+          accepted_at,settled_at FROM sales WHERE player_id=? ORDER BY settled_at DESC LIMIT 60''',(player['id'],))]''')
 
 # The computed ranking/revenue is non-authoritative UI information. Cache only
 # this expensive SQL aggregate, and make the cache bounded and short-lived.
