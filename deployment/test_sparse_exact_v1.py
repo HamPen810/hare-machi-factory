@@ -55,6 +55,28 @@ class SparseExactTests(unittest.TestCase):
             self.assertEqual((x*y).expand_for_test(),a*b)
             self.assertEqual(S.deserialize(x.serialize()).expand_for_test(),a)
 
+    def test_exact_compare_over_unbounded_decimal_gaps(self):
+        huge=S.parse('1e1000000000')
+        one=S.parse('1')
+        self.assertEqual((huge-one).sign(),1)
+        self.assertEqual((one-huge).sign(),-1)
+        self.assertEqual((huge+one).compare(huge),1)
+        self.assertEqual((huge-one).compare(huge),-1)
+        self.assertEqual((huge-one+one).compare(huge),0)
+        self.assertTrue((S.make([(1,1),(0,-10)])).is_zero())
+        self.assertFalse((huge-one).is_zero())
+        self.assertEqual((S.parse('0')-S.parse('1')).sign(),-1)
+
+    def test_compare_randomized_against_python_int(self):
+        r=random.Random(1755)
+        for _ in range(500):
+            terms=[(r.randint(0,100),r.randint(-10**30,10**30)) for _ in range(10)]
+            value=sum(coeff*10**exp for exp,coeff in terms)
+            n=S.make(terms)
+            self.assertEqual(n.sign(),(value>0)-(value<0))
+            other=r.randint(-10**50,10**50)
+            self.assertEqual(n.compare(S.parse(str(other))),(value>other)-(value<other))
+
     def test_input_length_and_term_budget(self):
         with self.assertRaises(ValueError):S.parse('1'*10001)
         with self.assertRaises(ValueError):
