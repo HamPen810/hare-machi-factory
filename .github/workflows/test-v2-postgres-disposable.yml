@@ -6,6 +6,8 @@ on:
       - deployment/test_v2_postgres_disposable_lab.py
       - deployment/sparse_exact_v1.py
       - deployment/sparse_exact_division.py
+      - deployment/v2_numeric_lossless_backfill.py
+      - deployment/test_v2_numeric_lossless_backfill.py
       - .github/workflows/test-v2-postgres-disposable.yml
   workflow_dispatch:
 permissions:
@@ -38,4 +40,4 @@ jobs:
         run: |
           python -m py_compile deployment/v2_postgres_disposable_lab.py deployment/test_v2_postgres_disposable_lab.py
           cd deployment
-          python -m unittest -v test_sparse_exact_v1.py test_sparse_exact_division.py test_v2_postgres_disposable_lab.py
+          python -m unittest -v test_sparse_exact_v1.py test_sparse_exact_division.py test_v2_numeric_lossless_backfill.py test_v2_postgres_disposable_lab.py
