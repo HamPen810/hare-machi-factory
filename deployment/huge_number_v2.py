@@ -43,10 +43,6 @@ class HugeNumber:
             raise TypeError("Exact Python integers required.")
         if not self.coefficient:
             object.__setattr__(self, 'exponent', 0)
-        if not self.exact and self.coefficient:
-            obj = self._normalized(self.coefficient, self.exponent, False)
-            object.__setattr__(self, 'coefficient', obj.coefficient)
-            object.__setattr__(self, 'exponent', obj.exponent)
 
     @staticmethod
     def _normalized(coefficient, exponent, exact):
