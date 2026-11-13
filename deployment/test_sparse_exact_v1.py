@@ -27,7 +27,7 @@ class SparseExactTests(unittest.TestCase):
 
     def test_decimal_scientific_integer_input(self):
         self.assertEqual(S.parse('1.25e7600').serialize(),'S1:125@7598')
-        self.assertEqual(S.parse('2.500e1').serialize(),'S1:2500@-2' if False else 'S1:25@0')
+        self.assertEqual(S.parse('2.500e1').serialize(),'S1:25@0')
         self.assertEqual(S.parse('1.25e3').expand_for_test(),1250)
         with self.assertRaises(ValueError):S.parse('1.25e0')
 
