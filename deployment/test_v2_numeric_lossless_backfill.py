@@ -55,7 +55,7 @@ class LosslessNumericBackfillTests(unittest.TestCase):
 
     def test_10000_digit_mantissa_roundtrip(self):
         n='1234567890'*1000
-        self.assertEqual(parse(n).compare(S.parse(n)),0)
+        self.assertEqual(parse(n).compare(S.make((10*i,1234567890) for i in range(1000))),0)
 
 if __name__=='__main__':
     unittest.main()
