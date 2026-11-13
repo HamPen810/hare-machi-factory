@@ -1,0 +1,57 @@
+name: Enforce market minimum selling price
+on:
+  push:
+    paths:
+      - .github/workflows/fix-market-min-selling-price.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-test-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch production archive
+        run: python deployment/fix-market-min-selling-price.py
+      - name: Validate server and UI price floors
+        run: |
+          mkdir -p /tmp/hare-price-floor
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('market.py','static/app.js','static/index.html'):
+                  p=Path('/tmp/hare-price-floor',name)
+                  p.parent.mkdir(parents=True,exist_ok=True)
+                  p.write_bytes(z.read(name))
+          market=Path('/tmp/hare-price-floor/market.py').read_text()
+          app=Path('/tmp/hare-price-floor/static/app.js').read_text()
+          html=Path('/tmp/hare-price-floor/static/index.html').read_text()
+          assert market.count("PRODUCTS[product][2]+1<=price<=99999")==2
+          assert "request.price<chosen.cost+1" in app
+          assert "ui('price').min=String(p().cost+1)" in app
+          assert '販売価格（製造価格＋1円以上）' in html
+          import ast
+          tree=ast.parse(market)
+          product_assign=next(n for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='PRODUCTS' for t in n.targets))
+          products=ast.literal_eval(product_assign.value)
+          assert {k:values[2]+1 for k,values in products.items()}=={'white':2,'sea':5,'shisa':23}
+          for key,details in products.items():
+              for price in (0,1,details[2],details[2]+1,99999,100000):
+                  allowed=type(price) is int and details[2]+1<=price<=99999
+                  assert allowed==(details[2]+1<=price<=99999)
+          print('Market selling price floors and frontend validation verified.')
+          PY
+          python -m py_compile /tmp/hare-price-floor/market.py
+          node --check /tmp/hare-price-floor/static/app.js
+      - name: Commit verified ZIP for automatic Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Set market minimum price to manufacturing cost plus one yen"
+            git push
+          fi
