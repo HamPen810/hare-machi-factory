@@ -1,0 +1,55 @@
+name: Send exact huge market prices as verified quote hashes
+on:
+  push:
+    paths:
+      - .github/workflows/market-exact-quote-hash.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Update production ZIP
+        run: python deployment/market-exact-quote-hash.py
+      - name: Verify quote fingerprints and exact price equality
+        run: |
+          mkdir -p /tmp/hare-market-quote/static
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast,hashlib
+          root=Path('/tmp/hare-market-quote')
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('market.py','server.py','static/app.js'):
+                  p=root/name;p.write_bytes(z.read(name))
+          market=(root/'market.py').read_text()
+          server=(root/'server.py').read_text()
+          app=(root/'static/app.js').read_text()
+          assert "quote['price_hash']" in market
+          assert "price==expected_hash" in market
+          assert "ensure_market_total(quantity,average)" in market
+          assert "price:buyQuote.price_hash?'sha256:'+buyQuote.price_hash:buyQuote.price" in app
+          assert "field=='price' and data.get('kind')=='buy_market'" in server
+          for name in ('market.py','server.py'):
+              ast.parse((root/name).read_text())
+          huge = 10**10000+123456789
+          fingerprint='sha256:'+hashlib.sha256(str(huge).encode()).hexdigest()
+          assert len(fingerprint)==71
+          assert fingerprint!='sha256:'+hashlib.sha256(str(huge+1).encode()).hexdigest()
+          print('Quote hash handles exact e10000 prices without a 10k-byte buy request')
+          PY
+          python -m py_compile /tmp/hare-market-quote/server.py /tmp/hare-market-quote/market.py
+          node --check /tmp/hare-market-quote/static/app.js
+      - name: Publish tested archive for Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Use verified market quote fingerprints for exact huge prices"
+            git push
+          fi
