@@ -1,0 +1,57 @@
+name: Guard exact large market transaction totals
+on:
+  push:
+    paths:
+      - .github/workflows/market-total-safe-limits.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch archive
+        run: python deployment/market-total-safe-limits.py
+      - name: Validate exact arithmetic and safety boundaries
+        run: |
+          mkdir -p /tmp/hare-market-limits
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          p=Path('/tmp/hare-market-limits/market.py')
+          with ZipFile('hare-machi-render.zip') as z:
+              p.write_bytes(z.read('market.py'))
+          source=p.read_text()
+          tree=ast.parse(source)
+          nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.Assign)) and
+                 (isinstance(n,ast.FunctionDef) and n.name=='ensure_market_total' or isinstance(n,ast.Assign)
+                  and any(isinstance(t,ast.Name) and t.id.startswith('MARKET_MAX_TOTAL') for t in n.targets))]
+          scope={}
+          exec(compile(ast.Module(body=nodes,type_ignores=[]),'<market-check>','exec'),scope)
+          ensure=scope['ensure_market_total']
+          for q,pv in [(10**4000,99999),(10**10000,10**3000),(10**49995,99999),(10**100,1)]:
+              ensure(q,pv)
+          for q,pv in [(10**50000,1),(10**45000,10**5000),(10**100001,1)]:
+              try:ensure(q,pv)
+              except ValueError:pass
+              else:raise AssertionError(f'Out-of-range product accepted {q.bit_length()} {pv.bit_length()}')
+          assert source.count('ensure_market_total(')>=5
+          assert "ensure_market_total(existing['quantity'],price)" in source
+          assert "ensure_market_total(total,price)" in source
+          assert "ensure_market_total(quantity,average)" in source
+          print('Exact e4000/e10000 amounts accepted, DB bounds rejected, and all entry checks present')
+          PY
+          python -m py_compile /tmp/hare-market-limits/market.py
+      - name: Publish verified ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Check large market totals before exact transactions"
+            git push
+          fi
