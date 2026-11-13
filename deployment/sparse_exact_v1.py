@@ -20,7 +20,7 @@ MAX_TERMS=2048
 MAX_COEFF_DIGITS=10000
 MAX_EXPONENT_TEXT_DIGITS=256
 MAX_EXPANSION_DIGITS=20000
-_DEC=re.compile(r'([+-]?)(\d+)(?:[eE]([+]?\d+))?\Z')
+_DEC=re.compile(r'([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+]?\d+))?\Z')
 _TERM=re.compile(r'(-?\d+)@(\d+)\Z')
 
 def _checked_int(s, max_digits):
@@ -68,9 +68,19 @@ class SparseExact:
         match=_DEC.fullmatch(text)
         if not match:
             raise ValueError('Enter a nonnegative integer in decimal or scientific notation')
-        sign,digits,exponent=match.groups()
-        coeff=_checked_int(('-' if sign=='-' else '')+digits,MAX_COEFF_DIGITS)
+        sign,whole,fraction,exponent=match.groups()
+        coefficient_text=whole+(fraction or '')
+        coeff=_checked_int(('-' if sign=='-' else '')+coefficient_text,MAX_COEFF_DIGITS)
         exp=_checked_int(exponent or '0',MAX_EXPONENT_TEXT_DIGITS)
+        decimal_places=len(fraction or '')
+        if exp<decimal_places:
+            places=decimal_places-exp
+            if coeff%(10**places):
+                raise ValueError('A quantity or money amount must be an integer')
+            coeff//=10**places
+            exp=0
+        else:
+            exp-=decimal_places
         return cls.make([(exp,coeff)])
 
     def serialize(self):
