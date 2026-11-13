@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/workflows/fix-market-settlement-db-pressure.yml
+      - deployment/fix-market-settlement-db-pressure.py
   workflow_dispatch:
 permissions:
   contents: write
