@@ -1,0 +1,20 @@
+name: Verify sparse exact huge integer prototype
+on:
+  push:
+    paths:
+      - deployment/sparse_exact_v1.py
+      - deployment/test_sparse_exact_v1.py
+      - .github/workflows/test-sparse-exact-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test exact arithmetic without touching the game ZIP or DB
+        run: |
+          python -m py_compile deployment/sparse_exact_v1.py
+          cd deployment
+          python -m unittest -v test_sparse_exact_v1.py
