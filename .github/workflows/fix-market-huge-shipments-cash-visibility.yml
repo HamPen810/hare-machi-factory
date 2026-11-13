@@ -33,7 +33,7 @@ jobs:
           assert "(262144 if self.path=='/api/action'" in server
           assert "if len(value)>131072:" in server
           assert "if (source.length > 131072) return null;" in numbers
-          assert 'ui(\\'cash\\').addEventListener(\\'click\\',showExactCash)' in js
+          assert "ui('cash').addEventListener('click',showExactCash)" in js
           assert "request.quantity=quantityText(ui('quantity')).trim()" in js
           assert "const amount=parseWhole(request.quantity)" in js
           assert "request.quantity=String(amount)" not in js
