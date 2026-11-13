@@ -1,0 +1,54 @@
+name: Apply exponent multiplier to all asset categories
+on:
+  push:
+    paths:
+      - .github/workflows/extend-asset-tax-exponent.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch production ZIP
+        run: python deployment/extend-asset-tax-exponent.py
+      - name: Check combined assets and exponent thresholds
+        run: |
+          mkdir -p /tmp/hare-asset-tax-check
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              Path('/tmp/hare-asset-tax-check/bank.py').write_bytes(z.read('bank.py'))
+              html = z.read('static/admin.html').decode()
+              assert '総資産の指数が10増えるごとに課税額が10倍' in html
+          import sys
+          sys.path.insert(0,'/tmp/hare-asset-tax-check')
+          import bank
+          examples = [(0,1),(1,1),(10**9,1),(10**10-1,1),
+                      (10**10,10),(10**19,10),(10**20,100),
+                      (10**100,10**10),(10**10001,10**1000)]
+          for amount,expected in examples:
+              result=bank.asset_exponent_multiplier(amount)
+              assert result==expected,(amount.bit_length(),result)
+          import inspect
+          source=inspect.getsource(bank.asset_tax)
+          assert "row['cash'] + row['deposit']" in source
+          assert "FROM stock" in source and "FROM listings" in source
+          assert "PRODUCTS[row['product']][1]" in source
+          assert "asset_exponent_multiplier(value)" in source
+          print('Combined asset taxation and exact tier tests passed')
+          PY
+          python -m py_compile /tmp/hare-asset-tax-check/bank.py
+      - name: Commit tested ZIP for Render automatic deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Apply additional exponent tax to combined cash and inventory assets"
+            git push
+          fi
