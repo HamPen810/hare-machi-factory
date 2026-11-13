@@ -1,0 +1,20 @@
+name: Check next-generation huge-number engine
+on:
+  push:
+    paths:
+      - deployment/huge_number_v2.py
+      - deployment/test_huge_number_v2.py
+      - .github/workflows/test-huge-number-v2.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test standalone hybrid-number module
+        run: |
+          python -m py_compile deployment/huge_number_v2.py
+          cd deployment
+          python -m unittest -v test_huge_number_v2.py
