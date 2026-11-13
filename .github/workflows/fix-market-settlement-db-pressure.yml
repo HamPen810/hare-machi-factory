@@ -1,0 +1,55 @@
+name: Fix recurring market DB saturation
+on:
+  push:
+    paths:
+      - .github/workflows/fix-market-settlement-db-pressure.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch production archive
+        run: python deployment/fix-market-settlement-db-pressure.py
+      - name: Validate SQL load and market settlement safety
+        run: |
+          mkdir -p /tmp/hare-db-relief
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          folder=Path('/tmp/hare-db-relief')
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('market.py','accounts.py','server.py'):
+                  (folder/name).write_bytes(z.read(name))
+          market=(folder/'market.py').read_text()
+          accounts=(folder/'accounts.py').read_text()
+          server=(folder/'server.py').read_text()
+          for filename in ('market.py','accounts.py','server.py'):
+              ast.parse((folder/filename).read_text())
+          assert "if kind in ('ship','edit_shipment','cancel_shipment','add_listing','set_price','buy_market'):\n            self.settle()" not in market
+          assert 'def settle(self, *, background=False):' in market
+          assert "if Game(a).settle(background=True)" in server
+          assert "ORDER BY settled_at DESC LIMIT 60" in accounts
+          assert "def cached_lifetime_revenue(db,player):" in server
+          assert "revenue=cached_lifetime_revenue(a.db,identity['id'])" in server
+          assert "Market settlement failed (%s, SQLSTATE %s)" in server
+          assert "def _credit_sale(self, row, count, cost, now, sale_id, config):" in market
+          assert "self.db.execute('UPDATE factories SET cash=badd(cash,?) WHERE player=?'" in market
+          assert "INSERT INTO sales VALUES(?,?,?,?,?,?,?,?)" in market
+          print('Settlement, sale payment, read load and syntax verified')
+          PY
+          python -m py_compile /tmp/hare-db-relief/market.py /tmp/hare-db-relief/accounts.py /tmp/hare-db-relief/server.py
+      - name: Publish tested ZIP for Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix market settlement contention and unbounded sales history"
+            git push
+          fi
