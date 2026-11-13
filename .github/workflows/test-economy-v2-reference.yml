@@ -1,0 +1,24 @@
+name: Verify isolated huge-number market reference
+on:
+  push:
+    paths:
+      - deployment/sparse_exact_v1.py
+      - deployment/sparse_exact_division.py
+      - deployment/economy_v2_reference.py
+      - deployment/test_economy_v2_reference.py
+      - .github/workflows/test-economy-v2-reference.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile reference code without editing live game archive
+        run: |
+          python -m py_compile deployment/sparse_exact_v1.py deployment/sparse_exact_division.py deployment/economy_v2_reference.py
+      - name: Run 3 exact-number and market reference test suites
+        run: |
+          cd deployment
+          python -m unittest -v test_sparse_exact_v1.py test_sparse_exact_division.py test_economy_v2_reference.py
