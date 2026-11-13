@@ -1,0 +1,41 @@
+name: Verify V2 on disposable PostgreSQL
+on:
+  push:
+    paths:
+      - deployment/v2_postgres_disposable_lab.py
+      - deployment/test_v2_postgres_disposable_lab.py
+      - deployment/sparse_exact_v1.py
+      - deployment/sparse_exact_division.py
+      - .github/workflows/test-v2-postgres-disposable.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hare_ci
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: hare_v2_ci_transactions
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hare_ci -d hare_v2_ci_transactions"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      HARE_V2_EPHEMERAL_CI: yes
+      HARE_V2_CI_DSN: postgresql://hare_ci:ci_only_password@localhost:5432/hare_v2_ci_transactions
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install disposable PostgreSQL-only driver
+        run: python -m pip install --disable-pip-version-check 'psycopg[binary]==3.2.12'
+      - name: Run V2 sparse math and real PostgreSQL concurrency tests
+        run: |
+          python -m py_compile deployment/v2_postgres_disposable_lab.py deployment/test_v2_postgres_disposable_lab.py
+          cd deployment
+          python -m unittest -v test_sparse_exact_v1.py test_sparse_exact_division.py test_v2_postgres_disposable_lab.py
