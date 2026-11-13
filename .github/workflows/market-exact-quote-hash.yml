@@ -21,7 +21,8 @@ jobs:
           python - <<'PY'
           from zipfile import ZipFile
           from pathlib import Path
-          import ast,hashlib
+          import ast,hashlib,sys
+          if hasattr(sys,'set_int_max_str_digits'):sys.set_int_max_str_digits(0)
           root=Path('/tmp/hare-market-quote')
           with ZipFile('hare-machi-render.zip') as z:
               for name in ('market.py','server.py','static/app.js'):
