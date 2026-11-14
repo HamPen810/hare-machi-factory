@@ -1,0 +1,80 @@
+name: Deploy anti-autoclicker detection and admin review
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/tap_monitor_v1.py
+      - deployment/install-tap-monitor-v1.py
+      - .github/workflows/deploy-tap-monitor-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Run detector unit tests (normal, fast, replayed behavior)
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0,'deployment')
+          import tap_monitor_v1 as m
+          now=1_800_000_000
+          s=m.classify(now,now,0,0,0,[],1)
+          assert s['score']==0
+          for i in range(1,100):
+              t=now+i*1000
+              s=m.classify(t,s['started_at'],s['last_at'],s['request_count'],s['tap_count'],s['gaps'],1)
+          assert s['score']==0, s
+          # A long consistent 20-tap stream gets multiple independent signals.
+          s=m.classify(now,now,0,0,0,[],20)
+          for i in range(1,450):
+              t=now+i*900
+              s=m.classify(t,s['started_at'],s['last_at'],s['request_count'],s['tap_count'],s['gaps'],20)
+          assert s['score']>=60 and s['reasons'],s
+          # Restart session after a pause: do not penalize old history.
+          s=m.classify(now+700000,s['started_at'],s['last_at'],s['request_count'],s['tap_count'],s['gaps'],1)
+          assert s['score']==0 and s['request_count']==1,s
+          # One exceptionally quick batch must not trigger a high score.
+          for ms in (50,100,150,200):
+              s=m.classify(now+700000+ms,s['started_at'],s['last_at'],s['request_count'],s['tap_count'],s['gaps'],20)
+          assert s['score']==0,s
+          print('PASS conservative tap pattern classifier')
+          PY
+      - name: Install game monitor + secured management panel
+        run: python deployment/install-tap-monitor-v1.py
+      - name: Validate archive and all required security boundaries
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import ast,zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              for f in ('market.py','server.py','tap_monitor_v1.py'):
+                  ast.parse(z.read(f).decode('utf8'),filename=f)
+              market=z.read('market.py').decode('utf8')
+              server=z.read('server.py').decode('utf8')
+              html=z.read('static/admin.html').decode('utf8')
+              js=z.read('static/admin.js').decode('utf8')
+          assert "return 10**(r[0] if r else 0)" in market
+          assert "tap_monitor_v1.record(self.db,p,now,count)" in market
+          assert "self.db.execute('UPDATE factories SET last_tap=? WHERE player=?',(now,p))" in market
+          assert "admin.authorized(admin_token,now//1000)" in server
+          assert "not write and self.path=='/api/admin/tap-monitor'" in server
+          assert "tap_monitor_state t JOIN players p" in server
+          assert "panel-tap-monitor" in html and "tab-tap-monitor" in html
+          assert "refreshTapMonitor" in js
+          assert "data.get('kind')" in server and "result=g.act(" in server
+          print('PASS protected admin route, monitoring, unchanged tap multiplier')
+          PY
+      - name: Publish checked production game ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Add observation-only autoclicker detection and admin panel"; git push; }
