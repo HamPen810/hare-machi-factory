@@ -44,14 +44,21 @@ function overview(){
  root.append(list);
 }
 function activate(name){
- q('#admin-mobile-nav')&&(q('#admin-mobile-nav').value=name);
+ const label=q('#admin-mobile-current'),tab=q('[data-panel="'+name+'"]');
+ if(label)label.textContent=tab?.textContent?.trim()||'概要';
  if(name==='overview')overview();
  if(name==='analysis')setTimeout(chartPaging,0);
  if(name==='notices'||name==='messages')drawInbox(name==='notices'?'posts':'messages');
 }
 function nav(){
- const sel=q('#admin-mobile-nav');
- if(sel)sel.onchange=()=>navigate(sel.value);
+ const toggle=q('#admin-mobile-toggle'),items=q('#admin-mobile-options');
+ if(toggle&&items){
+  toggle.addEventListener('click',()=>{items.hidden=!items.hidden;toggle.setAttribute('aria-expanded',String(!items.hidden));});
+  qa('[data-mobile-target]').forEach(item=>item.addEventListener('click',()=>{
+   items.hidden=true;toggle.setAttribute('aria-expanded','false');
+   navigate(item.dataset.mobileTarget);
+  }));
+ }
  q('[role=tablist]')?.addEventListener('click',ev=>{
   const b=ev.target.closest('[data-panel]');
   if(b)queueMicrotask(()=>activate(b.dataset.panel));
