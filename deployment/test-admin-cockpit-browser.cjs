@@ -45,8 +45,22 @@ try{
   const page=await browser.newPage({viewport});
   page.on('pageerror',e=>errors.push(viewport.width+': '+e.message));
   page.on('dialog',d=>d.dismiss());
+  const posted=[];
   await page.route('**/api/admin/**',async route=>{
-   const name=route.request().url().split('/api/admin/')[1].split('?')[0];
+   const request=route.request();
+   const name=request.url().split('/api/admin/')[1].split('?')[0];
+   if(request.method()==='POST'){
+    let body={};
+    try{body=request.postDataJSON();}catch(e){}
+    posted.push({name,body});
+    if(name==='funds'){
+     return await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+      display_name:'テスト工場長',kind:body.kind,student_id:body.student_id,
+      amount:body.amount,before_cash:'1000',after_cash:body.amount,
+      already_applied:false
+     })});
+    }
+   }
    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(payload[name]||{})});
   });
   await page.goto('http://127.0.0.1:8768/admin.html',{waitUntil:'domcontentloaded'});
@@ -103,6 +117,17 @@ try{
   assert.equal(await page.locator('#funds-form #funds-amount').count(),1,'Original funding input preserved');
   await page.locator('#funds-amount').fill('1e1000');
   assert.equal(await page.locator('#funds-amount').inputValue(),'1e1000','Large amount accepts original notation');
+  await page.locator('#funds-target').fill('2101');
+  await page.locator('#funds-form button[type="submit"]').click();
+  assert.equal(await page.locator('#funds-confirm').isVisible(),true,'Original confirmation opens');
+  assert.ok((await page.locator('#funds-confirm-message').innerText()).includes('10'),'Huge exponent represented in confirmation');
+  await page.locator('#funds-apply').click();
+  await page.waitForFunction(()=>document.querySelector('#funds-status')?.textContent?.includes('実行完了'));
+  const request=posted.find(x=>x.name==='funds');
+  assert.ok(request,'Original funds processing endpoint received POST');
+  assert.equal(request.body.student_id,'2101','Student selection unchanged');
+  assert.equal(request.body.amount,'1'+'0'.repeat(1000),'Exact 10^1000 amount survived UI to API without rounding');
+  assert.ok(typeof request.body.key==='string'&&request.body.key.length>10,'Idempotency key included');
   await goto('bank');
   assert.equal(await page.locator('#bank-config [name=limit]').count(),1);
   await goto('operations');
