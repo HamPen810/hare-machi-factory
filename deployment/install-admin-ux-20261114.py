@@ -202,6 +202,13 @@ old="function render(){const s=data.summary;"
 assert js.count(old)==1
 js=js.replace(old,
     "function render(){window.__adminDashboardSnapshot=data;document.dispatchEvent(new CustomEvent('admin-dashboard-ready',{detail:data}));const s=data.summary;",1)
+# Restore JavaScript parsability: an earlier detection feature declared
+# 'history' twice within refreshTapMonitor. Rename only the later binding.
+assert js.count("const history=await api('tap-monitor-events');")==1
+assert js.count("(history.events||[])")==1
+js=js.replace("const history=await api('tap-monitor-events');",
+              "const monitorHistory=await api('tap-monitor-events');",1)
+js=js.replace("(history.events||[])","(monitorHistory.events||[])",1)
 files['static/admin.js']=js.encode('utf8')
 
 # Serve one extra cacheable JS file. No new API endpoints or database queries.
