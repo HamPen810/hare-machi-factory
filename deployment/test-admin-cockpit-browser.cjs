@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
 const now=Date.now();
 const players=[
  {id:'1',student_id:'2101',display_name:'テスト工場長',class_number:1,
-  cash:'1e+120',tier:10,manufactured:'1e+200',revenue:'1e+110',net_profit:'1e+80',
+  cash:'1'+'0'.repeat(120),tier:10,manufactured:'1e+200',revenue:'1e+110',net_profit:'1e+80',
   stock:[{product:'white',quantity:'99'}]},
  {id:'2',student_id:'2102',display_name:'次の工場長',class_number:2,
   cash:'750000',tier:3,manufactured:'15000',revenue:'3000',net_profit:'1500',stock:[]}
@@ -119,15 +119,6 @@ try{
   assert.equal(await page.locator('#funds-amount').inputValue(),'1e1000','Large amount accepts original notation');
   await page.locator('#funds-target').fill('2101');
   await page.locator('#funds-form button[type="submit"]').click();
-  console.log('FUNDS_DIAGNOSTIC',JSON.stringify(await page.evaluate(()=>({
-    student:document.querySelector('#funds-target')?.value,
-    amount:document.querySelector('#funds-amount')?.value,
-    status:document.querySelector('#funds-status')?.textContent,
-    confirmHidden:document.querySelector('#funds-confirm')?.hidden,
-    confirmParent:document.querySelector('#funds-confirm')?.parentElement?.outerHTML?.slice(0,350),
-    message:document.querySelector('#funds-confirm-message')?.textContent,
-    kind:document.querySelector('#funds-kind')?.value
-   }))));
   assert.equal(await page.locator('#funds-confirm').isVisible(),true,'Original confirmation opens');
   assert.ok((await page.locator('#funds-confirm-message').innerText()).includes('10'),'Huge exponent represented in confirmation');
   await page.locator('#funds-apply').click();
