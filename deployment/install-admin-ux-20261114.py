@@ -180,12 +180,20 @@ assert html.count('<script src="/admin.js" defer></script>')==1
 html=html.replace('<script src="/admin.js" defer></script>',
                   '<script src="/admin.js" defer></script><script src="/admin-ux.js" defer></script>',1)
 
+# Earlier monitored-history patches appended the same read-only area twice.
+# Remove only the exact duplicate, retaining the original UI and all handlers.
+old_history='''<h3>最近の高リスク検知履歴</h3>
+<p class="muted">詳細履歴はこの画面を開いた場合のみ取得します。記録は高リスク時のみ、同一プレイヤーにつき6時間に最大1件です。</p>
+<div id="tap-monitor-events" class="table-wrap"></div>'''
+assert html.count(old_history)==2, ('unexpected monitor panel',html.count(old_history))
+html=html.replace(old_history,'',1)
+
 # Every existing form and input ID must be unchanged and unique.
 orig=files['static/admin.html'].decode('utf8')
 old_ids=re.findall(r'\bid="([^"]+)"',orig)
 new_ids=re.findall(r'\bid="([^"]+)"',html)
 for id in set(old_ids):
-    assert new_ids.count(id)==old_ids.count(id), ('ID count changed',id,old_ids.count(id),new_ids.count(id))
+    assert new_ids.count(id)==old_ids.count(id)-(1 if id=='tap-monitor-events' else 0), ('ID count changed',id,old_ids.count(id),new_ids.count(id))
 for id in ('tab-overview','tab-operations','panel-overview','panel-operations','analytics-content','analytics-stamp','an-market-window'):
     assert new_ids.count(id)==1, ('New UI ID missing/duplicate',id,new_ids.count(id))
 for form in ('announcement-form','rulebook-form','player-form','bank-config','bank-market','funds-form'):
@@ -202,15 +210,13 @@ old="function render(){const s=data.summary;"
 assert js.count(old)==1
 js=js.replace(old,
     "function render(){window.__adminDashboardSnapshot=data;document.dispatchEvent(new CustomEvent('admin-dashboard-ready',{detail:data}));const s=data.summary;",1)
-# Restore JavaScript parsability: an earlier detection feature declared
-# 'history' twice within refreshTapMonitor. Rename only the later binding.
-print("MONITOR-JS-COUNTS",js.count("const history=await api('tap-monitor-events');"),js.count("(history.events||[])"))
-print("MONITOR-JS-MATCHES",[(m.start(),repr(js[max(0,m.start()-230):m.start()+350])) for m in re.finditer("tap-monitor-events",js)])
-assert js.count("const history=await api('tap-monitor-events');")==1
-assert js.count("(history.events||[])")==1
-js=js.replace("const history=await api('tap-monitor-events');",
-              "const monitorHistory=await api('tap-monitor-events');",1)
-js=js.replace("(history.events||[])","(monitorHistory.events||[])",1)
+# Correct a duplicated read-only monitor-history renderer left by a prior
+# repeated deploy. No finance, settings or moderation handler is modified.
+pattern=r"  const history=await api\\('tap-monitor-events'\\);.*?   \\]\\)\\);"
+blocks=list(re.finditer(pattern,js,re.S))
+assert len(blocks)==2, ('Unexpected existing history render count',len(blocks))
+assert blocks[0].group(0)==blocks[1].group(0), 'History blocks diverged'
+js=js[:blocks[1].start()]+js[blocks[1].end():]
 files['static/admin.js']=js.encode('utf8')
 
 # Serve one extra cacheable JS file. No new API endpoints or database queries.
