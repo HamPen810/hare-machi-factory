@@ -169,8 +169,11 @@ function charts(){
  const market=[
   ['市場の価格推移','折れ線',()=>line(series('average_price'),'市場の平均価格','平均価格（桁）'),'商品別・直近48回の精算の平均価格。'],
   ['市場の販売数推移','折れ線',()=>line(series('sold'),'市場の販売数','販売数（桁）'),'巨大な数値は対数表示。商品別の精算順を描画。'],
-  ['商品保有者の内訳','ドーナツグラフ',()=>donut(products.map((k,i)=>({label:productsName[i],n:all.filter(p=>(p.stock||[]).some(s=>s.product===k&&signedLog(s.quantity)>0)).length})),'商品保有者の内訳'),'複数商品を保有する場合は重複計上。'],
-  ['クラス別の商品保有率','横棒グラフ',productShare,'複数商品の保有率を横並びに表示。重複保有があるため合計100%にはなりません。']
+  ['精算時点までの売れ筋構成','ドーナツグラフ',()=>donut(products.map((k,i)=>({label:productsName[i],n:ms().filter(v=>v.product===k).reduce((sum,v)=>sum+Math.max(0,Number(v.sold)>1e9?1e9:Number(v.sold)||0),0)})),'売れ筋構成（件数上限付き）'),'市場履歴を指定した時点まで集計。極端に大きな販売数は1レコードあたり10億個で表示上限。'],
+  ['精算別の販売量分布','ヒストグラム',()=>histogram(ms().map(v=>signedLog(v.sold)),'精算別の販売量分布'),'指定した時点までの精算履歴の販売数（桁数）を分布化。'],
+  ['市場の供給・販売相関','散布図',()=>scatter(ms().map(v=>[signedLog(v.offered),signedLog(v.sold)]),'市場の供給と販売の相関','出品量の桁数','販売量の桁数'),'指定した時点までの精算結果を散布図で表示。標本数は各商品の精算行数。'],
+  ['商品保有者の内訳','ドーナツグラフ',()=>donut(products.map((k,i)=>({label:productsName[i],n:all.filter(p=>(p.stock||[]).some(s=>s.product===k&&signedLog(s.quantity)>0)).length})),'商品保有者の内訳'),'現在の在庫スナップショット。時間スライダーの影響は受けません。複数商品保有は重複計上。'],
+  ['クラス別の商品保有率','横棒グラフ',productShare,'現在の在庫スナップショット。時間スライダーの影響は受けません。重複保有があるため合計100%にはなりません。']
  ];
  return {assets:wealth,business,market};
 }
