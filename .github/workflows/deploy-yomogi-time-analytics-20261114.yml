@@ -1,0 +1,64 @@
+name: Deploy Yomogi game typography and interactive analytics timeline
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/admin-insight-lab-20261114.js
+      - deployment/admin-insight-lab-20261114.css
+      - deployment/admin-time-studio-20261114.css
+      - deployment/install-insight-lab-and-yomogi-20261114.py
+      - .github/workflows/deploy-yomogi-time-analytics-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Check analysis script syntax
+        run: node --check deployment/admin-insight-lab-20261114.js
+      - name: Apply Yomogi game font and timeline analytics without touching game operations
+        run: python deployment/install-insight-lab-and-yomogi-20261114.py
+      - name: Assert original financial code and browser-side scripts remain valid
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          unzip -p hare-machi-render.zip static/admin-insight-lab.js >/tmp/admin-insight-lab.js
+          node --check /tmp/admin-insight-lab.js
+          python - <<'PY'
+          import zipfile,ast
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              gamecss=z.read('static/island.css').decode()
+              admin=z.read('static/admin.html').decode()
+              lab=z.read('static/admin-insight-lab.js').decode()
+              m=z.read('market.py').decode()
+              server=z.read('server.py').decode()
+              for f in ('market.py','server.py','bank.py','exact.py'):
+                  ast.parse(z.read(f).decode(),filename=f)
+          assert 'UNIVERSAL_YOMOGI_GAME_FONT_20261114' in gamecss
+          assert 'IslandHand' in gamecss and 'Yomogi-Regular.ttf' in gamecss
+          assert 'lab-timeline' in admin and 'lab-time-edge' in admin
+          assert 'signedLog' in lab and 'selectedRound' in lab
+          assert 'admin-dashboard-ready' in lab and 'setInterval' in lab
+          assert 'new Date(r*60000)' in lab
+          assert 'function scatter' in lab and 'function boxes' in lab
+          assert 'function radar' in lab and 'function heatmap' in lab
+          assert 'function histogram' in lab and 'function donut' in lab
+          assert "sunpress_price(level,self._sunpress_anchor(p))" in m
+          assert 'tap_monitor_v2.record' in m
+          for field in ('funds-form','funds-amount','bank-config','bank-market','announcement-form','panel-analysis','panel-notices','panel-messages'):
+              assert 'id="'+field+'"' in admin,field
+          assert "'/admin-insight-lab.js':'admin-insight-lab.js'" in server
+          print('PASS original financial logic, 16+ large plots, time navigation, Yomogi everywhere')
+          PY
+      - name: Publish verified bundle for automatic Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Deploy full Yomogi game font and animated historical admin Insight Lab"; git push; }
