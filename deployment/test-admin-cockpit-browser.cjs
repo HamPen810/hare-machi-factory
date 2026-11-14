@@ -16,7 +16,9 @@ const dashboard={
  players,pending:[],rankings:{manufactured:boards,revenue:boards,net_profit:boards},
  market:[
   {product:'white',round:Math.floor(now/60000)-2,offered:'150',sold:'120',average_price:10,sellers:2},
-  {product:'sea',round:Math.floor(now/60000)-2,offered:'40',sold:'25',average_price:40,sellers:1}
+  {product:'sea',round:Math.floor(now/60000)-2,offered:'40',sold:'25',average_price:40,sellers:1},
+  {product:'white',round:Math.floor(now/60000)-1,offered:'200',sold:'180',average_price:12,sellers:3},
+  {product:'shisa',round:Math.floor(now/60000),offered:'100',sold:'95',average_price:65,sellers:2}
  ],event:{phase:'open',practice:false}
 };
 const payload={
@@ -74,6 +76,19 @@ try{
   };
   await goto('analysis');
   assert.ok(await page.locator('#analytics-content .an-chart').count()>=2,'Charts loaded on first analysis view');
+  assert.ok(await page.locator('#insight-lab .lab-svg').count()===1,'One large insight chart visible');
+  await page.locator('#insight-lab .lab-tab[data-category="market"]').click();
+  assert.equal(await page.locator('.lab-timeline').isVisible(),true,'Historical market slider available');
+  const timeBefore=await page.locator('.lab-time-label').innerText();
+  await page.locator('.lab-slider').evaluate(e=>{e.value='0';e.dispatchEvent(new Event('input',{bubbles:true}));});
+  const timeAfter=await page.locator('.lab-time-label').innerText();
+  assert.notEqual(timeBefore,timeAfter,'Historical slider moves to earlier settlement');
+  await page.locator('.lab-play').click();
+  assert.ok((await page.locator('.lab-play').innerText()).includes('停止'),'Animation playback starts');
+  await page.locator('.lab-play').click();
+  assert.ok((await page.locator('.lab-play').innerText()).includes('再生'),'Animation can be paused');
+  await page.locator('#insight-lab .lab-tab[data-category="assets"]').click();
+  assert.equal(await page.locator('.lab-timeline').isVisible(),false,'Current-state analytics do not falsely show history');
   const chartScroll=await page.evaluate(()=>document.documentElement.scrollHeight);
   assert.ok(chartScroll<=viewport.height+3);
   await goto('messages');
