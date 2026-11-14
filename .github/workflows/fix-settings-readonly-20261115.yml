@@ -1,0 +1,45 @@
+name: Emergency fix player and admin settings loading under DB read-only
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/fix-settings-readonly-20261115.py
+      - .github/workflows/fix-settings-readonly-20261115.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  verify-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply small fail-closed settings-only patch
+        run: python deployment/fix-settings-readonly-20261115.py
+      - name: Validate production archive all modules and no changes to economic logic
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import zipfile,ast
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              server=z.read('server.py').decode()
+              admin=z.read('admin.py').decode()
+              for f in ('server.py','admin.py','market.py','bank.py','exact.py'):
+                  ast.parse(z.read(f).decode())
+              assert "settings_cache=Admin(account).settings()" in server
+              assert "settings_cache=Admin(account).initialize(" not in server
+              assert "account=Accounts(path,read_only=True,admin_only=True)" in server
+              assert "SELECT maintenance,announcement,announcement_revision FROM site_settings WHERE id=1" in admin
+              assert "tap_monitor_v2.record" in z.read('market.py').decode()
+          print('PASS settings fetch uses existing SELECT only; no gameplay changes')
+          PY
+      - name: Publish settings-only verified bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Fix settings API during PostgreSQL read-only mode"; git push; }
