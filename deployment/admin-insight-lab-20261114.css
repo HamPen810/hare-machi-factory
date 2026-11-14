@@ -1,0 +1,49 @@
+/* Insight Lab: one large chart per page, typography matches Yomogi. */
+body.console-active #panel-analysis{position:relative;min-height:0;min-width:0;overflow:hidden}
+body.console-active #panel-analysis > .an-title,
+body.console-active #panel-analysis > .an-section-title,
+body.console-active #panel-analysis > .an-toolbar,
+body.console-active #panel-analysis > #analytics-content,
+body.console-active #panel-analysis > .an-note,
+body.console-active #panel-analysis > #console-chart-pager{display:none!important}
+body.console-active #panel-analysis #insight-lab{
+ display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;gap:8px;
+ font-family:IslandHand,'Yomogi',cursive;
+}
+body.console-active #insight-lab *{font-family:IslandHand,'Yomogi',cursive!important}
+body.console-active .lab-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex:0 0 auto}
+body.console-active .lab-head .lab-title{font-size:clamp(17px,2vw,23px);margin:0;color:#213b46;line-height:1.25;letter-spacing:.03em}
+body.console-active .lab-kicker{display:block;font-size:9px;letter-spacing:.17em;color:#278e86;font-weight:800}
+body.console-active .lab-all-count{font-size:12px;color:#6f858b;white-space:nowrap}
+body.console-active .lab-tabs{display:flex;gap:6px;flex:0 0 auto}
+body.console-active .lab-tab{padding:7px 14px;min-height:37px;color:#5d7780;background:#f5f8f8;border:1px solid #e5ecee;border-radius:9px;font-size:13px;cursor:pointer}
+body.console-active .lab-tab[aria-pressed="true"]{color:#106c66;background:#e3f3f0;border-color:#b7dfd7;font-weight:800}
+body.console-active .lab-card{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1;background:#fbfcfc;border:1px solid #e1e9eb;border-radius:12px;padding:10px 14px;overflow:hidden}
+body.console-active .lab-card-head{flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:4px}
+body.console-active .lab-card-head h3{margin:0;font-size:clamp(15px,1.7vw,20px);font-weight:800}
+body.console-active .lab-chart-kind{font-size:11px;white-space:nowrap;background:#e9f4f1;color:#187e73;padding:5px 9px;border-radius:12px}
+body.console-active .lab-svg{width:100%;height:100%;min-height:0;flex:1;overflow:visible;display:block}
+body.console-active .lab-svg text{font-family:IslandHand,'Yomogi',cursive!important}
+body.console-active .lab-note{flex:0 0 auto;font-size:clamp(11px,1.2vw,13px);color:#597178;margin:0!important;line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+body.console-active .lab-nav{display:flex;align-items:center;justify-content:center;gap:12px;flex:0 0 auto;min-height:34px}
+body.console-active .lab-nav-btn{background:#fff;border:1px solid #d1e4e2;border-radius:9px;color:#26736e;min-height:34px;min-width:90px;font-size:12px;font-weight:800}
+body.console-active .lab-counter{font-size:13px;color:#5b7780;font-variant-numeric:tabular-nums;min-width:56px;text-align:center}
+@media(max-width:740px){
+ body.console-active #panel-analysis #insight-lab{gap:5px}
+ body.console-active .lab-head .lab-title{font-size:17px}
+ body.console-active .lab-all-count{font-size:10px}
+ body.console-active .lab-tab{padding:6px 9px;font-size:11px;min-height:32px;flex:1}
+ body.console-active .lab-card{padding:6px 8px;border-radius:9px}
+ body.console-active .lab-card-head h3{font-size:14px}
+ body.console-active .lab-chart-kind{font-size:10px;padding:4px 6px}
+ body.console-active .lab-note{font-size:11px;line-height:1.25}
+ body.console-active .lab-nav{gap:8px;min-height:31px}
+ body.console-active .lab-nav-btn{min-height:30px;font-size:11px}
+}
+@media(max-height:650px){
+ body.console-active .lab-head{display:none}
+ body.console-active .lab-tabs{gap:3px}
+ body.console-active .lab-tab{padding:4px 7px;min-height:28px}
+ body.console-active .lab-nav{min-height:28px}
+ body.console-active .lab-nav-btn{min-height:28px}
+}
