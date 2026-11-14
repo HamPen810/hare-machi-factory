@@ -24,11 +24,9 @@ def modify(name,old,new):
     files[name]=s.replace(old,new).encode('utf8')
 
 modify('market.py',
+"""import bank""",
 """import bank
-import random""",
-"""import bank
-import tap_monitor_v1
-import random""")
+import tap_monitor_v1""")
 modify('market.py',
 """                self.db.execute('UPDATE factories SET last_tap=? WHERE player=?',(now,p))""",
 """                self.db.execute('UPDATE factories SET last_tap=? WHERE player=?',(now,p))
