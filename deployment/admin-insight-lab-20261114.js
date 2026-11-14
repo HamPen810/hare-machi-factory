@@ -182,6 +182,27 @@ function init(){
  const allCount=D('span','', 'lab-all-count');header.append(title,allCount);
  const tabs=D('div',undefined,'lab-tabs'),chart=D('div',undefined,'lab-card'),notes=D('p','','lab-note'),footer=D('div',undefined,'lab-nav');
  const count=D('span','','lab-counter');
+ const timeline=D('div',undefined,'lab-timeline'),timelineTop=D('div',undefined,'lab-timeline-head');
+ const titleTime=D('strong','市場履歴を時間で探索','lab-timeline-title'),timeLabel=D('span','','lab-time-label');
+ timelineTop.append(titleTime,timeLabel);
+ const timelineRow=D('div',undefined,'lab-timeline-row');
+ const play=D('button','▶ 再生','lab-play');play.type='button';play.setAttribute('aria-label','時系列を再生・停止');
+ const slider=D('input',undefined,'lab-slider');slider.type='range';slider.min='0';slider.max='0';slider.step='1';slider.value='0';slider.setAttribute('aria-label','市場の精算時点');
+ const start=D('span','開始','lab-time-edge'),end=D('span','最新','lab-time-edge');
+ timelineRow.append(play,start,slider,end);timeline.append(timelineTop,timelineRow);
+ const stop=()=>{if(playback!==null){clearInterval(playback);playback=null;}play.textContent='▶ 再生';play.setAttribute('aria-pressed','false');};
+ const syncTimeline=()=>{const a=rounds();timeline.hidden=category!=='market'||a.length<2;slider.max=String(Math.max(0,a.length-1));
+   if(!a.length){timeLabel.textContent='まだ履歴がありません';return;}
+   const at=a.findIndex(r=>r===selectedRound);slider.value=String(at>=0?at:a.length-1);
+   const chosen=a[Number(slider.value)];timeLabel.textContent=roundDate(chosen)+'（'+(Number(slider.value)+1)+' / '+a.length+' 時点）';
+   start.textContent=roundDate(a[0]);end.textContent=roundDate(a[a.length-1]);};
+ slider.addEventListener('input',()=>{const a=rounds();selectedRound=a[Number(slider.value)]??null;render();});
+ play.addEventListener('click',()=>{if(playback!==null){stop();return;}const a=rounds();if(a.length<2)return;
+   if(Number(slider.value)>=a.length-1){selectedRound=a[0];render();}
+   play.textContent='Ⅱ 停止';play.setAttribute('aria-pressed','true');
+   playback=setInterval(()=>{const a=rounds(),i=a.indexOf(selectedRound);
+     if(i<0||i>=a.length-1){stop();return;}selectedRound=a[i+1];render();},850);});
+
  const render=()=>{
   for(const b of tabs.children)b.setAttribute('aria-pressed',String(b.dataset.category===category));
   syncTimeline();
