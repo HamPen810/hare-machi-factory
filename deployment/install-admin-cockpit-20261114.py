@@ -16,7 +16,25 @@ assert 'id="tab-overview"' in html
 assert 'id="panel-operations"' in html
 assert 'id="bulletin-admin-posts"' in html
 assert 'id="bulletin-admin-messages"' in html
-assert 'id="tab-analysis"' not in html
+if 'id="tab-analysis"' in html:
+    # A previous workflow may have already published the shell.  Subsequent
+    # revisions update only the standalone presentation JS, not page or handlers.
+    assert 'id="panel-notices"' in html and 'id="panel-messages"' in html
+    assert 'id="panel-advanced"' in html and 'id="admin-mobile-nav"' in html
+    assert 'static/admin-cockpit.js' in files
+    files['static/admin-cockpit.js']=Path('deployment/admin-cockpit-20261114.js').read_bytes()
+    out=io.BytesIO()
+    with ZipFile(out,'w') as z:
+        z.comment=comment
+        for info,data in entries:z.writestr(info,files[info.filename])
+    with ZipFile(io.BytesIO(out.getvalue())) as z:
+        assert z.testzip() is None
+        for info,data in entries:
+            if info.filename!='static/admin-cockpit.js':
+                assert z.read(info.filename)==data,info.filename
+    if out.getvalue()!=p.read_bytes():p.write_bytes(out.getvalue())
+    print('PASS: refreshed admin presentation JavaScript only')
+    raise SystemExit(0)
 
 old_html=html
 before=collections.Counter(re.findall(r'\bid="([^"]+)"',html))
