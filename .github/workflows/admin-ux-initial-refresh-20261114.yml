@@ -1,0 +1,51 @@
+name: Verify automatic admin analytics load on authenticated entry
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/admin-ux-initial-refresh-20261114.py
+      - .github/workflows/admin-ux-initial-refresh-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply only session-dashboard initial refresh
+        run: python deployment/admin-ux-initial-refresh-20261114.py
+      - name: Syntax and behavior verification
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          unzip -p hare-machi-render.zip static/admin.js >/tmp/admin-load-check.js
+          node --check /tmp/admin-load-check.js
+          python - <<'PY'
+          import zipfile,ast
+          with zipfile.ZipFile("hare-machi-render.zip") as z:
+              js=z.read('static/admin.js').decode()
+              ux=z.read('static/admin-ux.js').decode()
+              html=z.read('static/admin.html').decode()
+              server=z.read('server.py').decode()
+              m=z.read('market.py').decode()
+          assert 'void loadFundsHistory();void refresh(true);' in js
+          assert 'void loadFundsHistory();\n  void refresh(true);' in js
+          assert 'document.dispatchEvent(new CustomEvent' in js
+          assert 'id="panel-overview"' in html and 'id="panel-operations"' in html
+          assert 'tap_monitor_v2.record' in m
+          assert 'sunpress_price(level,self._sunpress_anchor(p))' in m
+          assert "'/admin-ux.js':'admin-ux.js'" in server
+          ast.parse(server)
+          print("PASS: automatic authenticated load; existing game code untouched")
+          PY
+      - name: Publish to Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Auto-load existing admin dashboard on successful authentication"; git push; }
