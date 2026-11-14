@@ -8,3 +8,9 @@ with ZipFile("hare-machi-render.zip") as z:
   print("FONT_SOURCE",name, matches[:30])
  print("ADMIN-CSS-LENGTH",len(z.read('static/admin.html')))
  print("GAME-INDEX",[x for x in z.namelist() if x in ('static/index.html','static/game.html')])
+
+ print("GAME_HTML_HEAD",z.read('static/index.html').decode('utf-8')[:11000])
+ print("FONT_RESOURCE_PATHS",[x for x in z.namelist() if 'font' in x.lower() or 'yomogi' in x.lower()])
+ for name in ('static/island.css','static/polish.css'):
+  css=z.read(name).decode('utf-8')
+  print("CSS_END",name,css[-1500:])
