@@ -1,0 +1,46 @@
+name: Fix game Data tab read performance
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/fix-data-tab-20261114.py
+      - .github/workflows/fix-data-tab-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-tab-hotfix-main
+  cancel-in-progress: false
+jobs:
+  patch-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch production archive with fail-closed preconditions
+        run: python deployment/fix-data-tab-20261114.py
+      - name: Verify production archive
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import ast
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              m=z.read('market.py').decode()
+              j=z.read('static/app.js').decode()
+              s=z.read('server.py').decode()
+              ast.parse(m)
+              ast.parse(s)
+              assert "start=max(0,end-11)" in m
+              assert "path==='data'?45000:15000" in j
+              assert "X-Timeline-Before" in s
+              assert "loadOlderTimeline" in j
+          print('Data-tab safety assertions passed')
+          PY
+      - name: Publish verified archive to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Hotfix Data tab 12-minute paging and client timeout"; git push; }
