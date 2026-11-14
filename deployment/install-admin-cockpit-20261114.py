@@ -31,8 +31,11 @@ def move(pattern,description):
     return value
 
 # Original announcement form and its handlers are moved, NEVER rebuilt.
-announcement=move(r'<details class="an-fold" open><summary>全体へのお知らせ</summary>.*?</form></details>',
-                  'announcement details/form')
+announcement=move(r'<details class="an-fold" open><summary>全体へのお知らせ</summary>\s*<form id="announcement-form".*?</form>',
+                  'announcement form')
+# The preexisting source has an unmatched announcement <details> opening;
+# move the intact <form> only and drop this presentation wrapper.
+announcement=announcement[announcement.index('<form id="announcement-form"'):]
 post_list=move(r'<h3>配信済みのお知らせ</h3>\s*<div id="bulletin-admin-posts"[^>]*></div>',
                'bulletin post list')
 message_list=move(r'<h3>プレイヤーからのメッセージ</h3>\s*<div id="bulletin-admin-messages"[^>]*></div>',
