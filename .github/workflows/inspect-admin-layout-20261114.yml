@@ -1,0 +1,17 @@
+name: Inspect current admin interface without deployment
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/inspect-admin-layout-20261114.py
+      - .github/workflows/inspect-admin-layout-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report existing panels bulletin routes and client behavior
+        run: python deployment/inspect-admin-layout-20261114.py
