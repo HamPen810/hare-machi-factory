@@ -3,10 +3,12 @@
 (()=>{
 'use strict';
 const Q=s=>document.querySelector(s), NS='http://www.w3.org/2000/svg';
-const C=['#138e88','#6789cd','#df9e57','#a487cc','#d77d92','#6eaaa4','#9baf68'];
+const C=['#187f85','#d38a55','#677fa8','#9c839c','#73a69a','#c17f7f','#879b67'];
 const N=(name,attrs={},str)=>{const e=document.createElementNS(NS,name);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,String(v)));if(str!==undefined)e.textContent=String(str);return e;};
 const D=(name,text,cls)=>{const e=document.createElement(name);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;};
-let state=null,category='assets',page=0;
+let state=null,category='assets',page=0,selectedRound=null,playback=null;
+const rounds=()=>[...new Set((state?.market||[]).map(x=>Number(x.round)).filter(Number.isFinite))].sort((a,b)=>a-b);
+const roundDate=r=>new Date(r*60000).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const numerical=n=>Number.isFinite(Number(n))?Number(n):0;
 function signedLog(value){
  let s=String(value??'0').trim(),sign=1;
@@ -21,7 +23,7 @@ function signedLog(value){
  return sign*(l>8?l:l < -14?0:Math.log10(1+10**l));
 }
 const ps=()=>Array.isArray(state?.players)?state.players:[];
-const ms=()=>Array.isArray(state?.market)?state.market:[];
+const ms=()=>Array.isArray(state?.market)?state.market.filter(x=>selectedRound==null||Number(x.round)<=selectedRound):[];
 const datum=(p,k)=>k==='tier'?numerical(p.tier):signedLog(p[k]);
 const data=k=>ps().map(p=>datum(p,k));
 const clean=a=>a.filter(Number.isFinite).sort((a,b)=>a-b);
@@ -182,6 +184,7 @@ function init(){
  const count=D('span','','lab-counter');
  const render=()=>{
   for(const b of tabs.children)b.setAttribute('aria-pressed',String(b.dataset.category===category));
+  syncTimeline();
   if(!state){chart.replaceChildren(D('p','分析データを読み込み中…'));return;}
   const arr=charts()[category];page=(page+arr.length)%arr.length;
   const [label,kind,draw,detail]=arr[page];
@@ -190,14 +193,15 @@ function init(){
   count.textContent=(page+1)+' / '+arr.length;allCount.textContent=Object.values(charts()).reduce((a,b)=>a+b.length,0)+' グラフ';
  };
  [['assets','資産と格差'],['business','経営・相関'],['market','市場・流通']].forEach(([id,label])=>{
-  const b=D('button',label,'lab-tab');b.type='button';b.dataset.category=id;b.onclick=()=>{category=id;page=0;render();};tabs.append(b);
+  const b=D('button',label,'lab-tab');b.type='button';b.dataset.category=id;b.onclick=()=>{stop();category=id;page=0;render();};tabs.append(b);
  });
  const prev=D('button','← 前','lab-nav-btn'),next=D('button','次 →','lab-nav-btn');prev.type=next.type='button';
  prev.onclick=()=>{page--;render();};next.onclick=()=>{page++;render();};
- footer.append(prev,count,next);root.append(header,tabs,chart,notes,footer);panel.append(root);
- document.addEventListener('admin-dashboard-ready',e=>{state=e.detail;render();});
- if(window.__adminDashboardSnapshot)state=window.__adminDashboardSnapshot;
+ footer.append(prev,count,next);root.append(header,tabs,timeline,chart,notes,footer);panel.append(root);
+ document.addEventListener('admin-dashboard-ready',e=>{state=e.detail;selectedRound=rounds().at(-1)??null;stop();render();});
+ if(window.__adminDashboardSnapshot){state=window.__adminDashboardSnapshot;selectedRound=rounds().at(-1)??null;}
  Q('[data-panel="analysis"]')?.addEventListener('click',()=>requestAnimationFrame(render));
+ document.querySelector('[role="tablist"]')?.addEventListener('click',e=>{if(e.target.closest('[data-panel]')?.dataset.panel!=='analysis')stop();});
  render();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
