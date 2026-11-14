@@ -119,6 +119,15 @@ try{
   assert.equal(await page.locator('#funds-amount').inputValue(),'1e1000','Large amount accepts original notation');
   await page.locator('#funds-target').fill('2101');
   await page.locator('#funds-form button[type="submit"]').click();
+  console.log('FUNDS_DIAGNOSTIC',JSON.stringify(await page.evaluate(()=>({
+    student:document.querySelector('#funds-target')?.value,
+    amount:document.querySelector('#funds-amount')?.value,
+    status:document.querySelector('#funds-status')?.textContent,
+    confirmHidden:document.querySelector('#funds-confirm')?.hidden,
+    confirmParent:document.querySelector('#funds-confirm')?.parentElement?.outerHTML?.slice(0,350),
+    message:document.querySelector('#funds-confirm-message')?.textContent,
+    kind:document.querySelector('#funds-kind')?.value
+   }))));
   assert.equal(await page.locator('#funds-confirm').isVisible(),true,'Original confirmation opens');
   assert.ok((await page.locator('#funds-confirm-message').innerText()).includes('10'),'Huge exponent represented in confirmation');
   await page.locator('#funds-apply').click();
