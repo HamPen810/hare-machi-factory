@@ -63,7 +63,7 @@ def record(db,player,now,count):
     try:
         row=db.execute(
             "SELECT started_at,last_at,request_count,tap_count,gaps_json,"
-            "flagged_at FROM tap_monitor_state WHERE player=?",(player,)
+            "flagged_at,score,reasons FROM tap_monitor_state WHERE player=?",(player,)
         ).fetchone()
         if row:
             d=dict(row)
@@ -77,15 +77,21 @@ def record(db,player,now,count):
             calls=int(d["request_count"])
             taps=int(d["tap_count"])
             flagged=d["flagged_at"]
+            previous_score=int(d["score"])
+            previous_reasons=d["reasons"]
         else:
             prior=[]
             started=now
             last=0
             calls=taps=0
             flagged=None
+            previous_score=0
+            previous_reasons=""
         result=classify(int(now),started,last,calls,taps,prior,int(count))
-        if result["score"]>=60 and flagged is None:
+        if result["score"]>=60:
             flagged=now
+        peak_score=max(previous_score,result["score"])
+        peak_reasons=(result["reasons"] if result["score"]>previous_score else previous_reasons)
         db.execute(
             "INSERT INTO tap_monitor_state("
             "player,started_at,last_at,request_count,tap_count,gaps_json,"
@@ -100,7 +106,7 @@ def record(db,player,now,count):
             "rate=excluded.rate",
             (player,result["started_at"],result["last_at"],result["request_count"],
              result["tap_count"],json.dumps(result["gaps"],separators=(",",":")),
-             result["score"],result["reasons"],flagged,result["avg_interval_ms"],
+             peak_score,peak_reasons,flagged,result["avg_interval_ms"],
              result["cv"],result["rate"])
         )
         db.execute("RELEASE SAVEPOINT tap_monitor_safe")
