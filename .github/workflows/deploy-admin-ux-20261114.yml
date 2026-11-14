@@ -1,0 +1,77 @@
+name: Deploy admin workspace redesign and analytics
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/admin-ux-20261114.js
+      - deployment/install-admin-ux-20261114.py
+      - .github/workflows/deploy-admin-ux-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  redesign-verify-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Compile-check new admin analytics script
+        run: node --check deployment/admin-ux-20261114.js
+      - name: Apply fail-closed layout-only game archive patch
+        run: python deployment/install-admin-ux-20261114.py
+      - name: Validate production server and both frontend scripts
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import zipfile,ast,re
+          from html.parser import HTMLParser
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              names=z.namelist()
+              server=z.read('server.py').decode()
+              admin=z.read('static/admin.js').decode()
+              ux=z.read('static/admin-ux.js').decode()
+              html=z.read('static/admin.html').decode()
+              market=z.read('market.py').decode()
+              bank=z.read('bank.py').decode()
+              num=z.read('exact.py').decode()
+          ast.parse(server);ast.parse(market);ast.parse(bank);ast.parse(num)
+          assert "window.__adminDashboardSnapshot=data" in admin
+          assert "'/admin-ux.js':'admin-ux.js'" in server
+          assert 'id="panel-overview"' in html
+          assert 'id="panel-operations"' in html
+          assert 'id="panel-tap-monitor"' in html
+          assert 'id="panel-funds"' in html
+          assert 'id="panel-bank"' in html
+          assert 'id="funds-form"' in html
+          assert 'id="bank-config"' in html
+          assert 'id="bank-market"' in html
+          assert 'id="asset-tax-preview"' in html
+          assert 'id="asset-tax-apply"' in html
+          assert 'id="funds-confirm"' in html
+          assert 'id="player-form"' in html
+          assert 'id="announcement-form"' in html
+          assert 'id="rulebook-form"' in html
+          assert 'data-panel="overview"' in html
+          assert 'data-panel="operations"' in html
+          assert 'id="stats"' in html
+          assert 'function logMagnitude(v)' in ux
+          assert "document.addEventListener('admin-dashboard-ready'" in ux
+          assert 'tap_monitor_v2.record' in market
+          assert "return 10**(r[0] if r else 0)" in market
+          assert "sunpress_price(level,self._sunpress_anchor(p))" in market
+          print('PASS: admin UI, unchanged economics, preserved controls')
+          PY
+          unzip -p hare-machi-render.zip static/admin.js > /tmp/verify-admin.js
+          unzip -p hare-machi-render.zip static/admin-ux.js > /tmp/verify-admin-ux.js
+          node --check /tmp/verify-admin.js
+          node --check /tmp/verify-admin-ux.js
+      - name: Publish verified ZIP to main for Render auto deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Redesign admin tabs and add local analytics visualizations"; git push; }
