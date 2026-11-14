@@ -1,0 +1,42 @@
+name: Restore Sunpress multiplier to original 10x
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/restore-sunpress-10x-20261114.py
+      - .github/workflows/restore-sunpress-10x-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Restore only Sunpress multiplier
+        run: python deployment/restore-sunpress-10x-20261114.py
+      - name: Check code and archive
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import zipfile,ast
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              m=z.read('market.py').decode('utf8')
+          ast.parse(m)
+          assert "return 10**(r[0] if r else 0)" in m
+          assert "f['tap_power']=power(f['tier'])*10**levels.get('sunpress',0)" in m
+          assert "cost=EQUIPMENT[kind][1]*5**level" in m
+          assert "EQUIPMENT={'sunpress':('おひさまプレス',50000),'islandline':('南風オートライン',250000)}" in m
+          print('PASS: original 10x restored, pricing unchanged')
+          PY
+      - name: Publish to main for Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Restore original Sunpress 10x multiplier"; git push; }
