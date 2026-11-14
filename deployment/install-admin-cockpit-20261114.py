@@ -16,12 +16,45 @@ assert 'id="tab-overview"' in html
 assert 'id="panel-operations"' in html
 assert 'id="bulletin-admin-posts"' in html
 assert 'id="bulletin-admin-messages"' in html
+def upgrade_mobile_menu(page):
+    """Use native buttons instead of a select upgraded by legacy tabs.js."""
+    match=re.search(r'<select id="admin-mobile-nav"[^>]*>.*?</select>',page,re.S)
+    if not match:
+        assert 'id="admin-mobile-toggle"' in page, 'Mobile navigation missing'
+        return page
+    options=re.findall(r'<option value="([^"]+)">([^<]+)</option>',match.group())
+    assert len(options)>=14,('missing management destinations',len(options))
+    choices=''.join('<button type="button" data-mobile-target="'+key+'">'+label+'</button>'
+                    for key,label in options)
+    menu=('''<div id="admin-mobile-nav" role="group" aria-label="画面の切替">
+<button id="admin-mobile-toggle" type="button" aria-expanded="false" aria-controls="admin-mobile-options">
+<span id="admin-mobile-current">概要</span><span aria-hidden="true"> ▾</span>
+</button><div id="admin-mobile-options" hidden>'''+choices+'</div></div>')
+    page=page[:match.start()]+menu+page[match.end():]
+    marker='/* ADMIN_NATIVE_MOBILE_MENU_V4 */'
+    if marker not in page:
+        styles=marker+'''
+@media(min-width:741px){body.console-active #admin-mobile-nav{display:none!important}}
+@media(max-width:740px){
+body.console-active #admin-mobile-nav{display:block;position:relative;padding:0;background:none;border:0;box-shadow:none;overflow:visible;z-index:70}
+body.console-active #admin-mobile-toggle{height:38px;width:100%;border:1px solid #278274;border-radius:11px;background:#0b3e44;color:white;font-size:13px;font-weight:800;text-align:left;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+body.console-active #admin-mobile-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;position:absolute;top:calc(100% + 5px);left:0;right:0;border-radius:12px;background:#0b3540;padding:8px;box-shadow:0 18px 40px #00242d55;max-height:calc(100dvh - 100px);overflow:hidden}
+body.console-active #admin-mobile-options[hidden]{display:none!important}
+body.console-active #admin-mobile-options button{font-size:11px;font-weight:750;color:#e5faf4;background:#16535a;border:1px solid #2b7072;border-radius:7px;min-height:32px;padding:6px;white-space:normal;line-height:1.1}
+body.console-active #admin-mobile-options button:hover,body.console-active #admin-mobile-options button:focus-visible{background:#d5fff3;color:#104b4b}
+}
+'''
+        page=page.replace('</style>',styles+'</style>',1)
+    return page
+
 if 'id="tab-analysis"' in html:
     # A previous workflow may have already published the shell.  Subsequent
     # revisions update only the standalone presentation JS, not page or handlers.
     assert 'id="panel-notices"' in html and 'id="panel-messages"' in html
     assert 'id="panel-advanced"' in html and 'id="admin-mobile-nav"' in html
     assert 'static/admin-cockpit.js' in files
+    html=upgrade_mobile_menu(html)
+    files['static/admin.html']=html.encode('utf8')
     files['static/admin-cockpit.js']=Path('deployment/admin-cockpit-20261114.js').read_bytes()
     out=io.BytesIO()
     with ZipFile(out,'w') as z:
@@ -30,10 +63,10 @@ if 'id="tab-analysis"' in html:
     with ZipFile(io.BytesIO(out.getvalue())) as z:
         assert z.testzip() is None
         for info,data in entries:
-            if info.filename!='static/admin-cockpit.js':
+            if info.filename not in ('static/admin-cockpit.js','static/admin.html'):
                 assert z.read(info.filename)==data,info.filename
     if out.getvalue()!=p.read_bytes():p.write_bytes(out.getvalue())
-    print('PASS: refreshed admin presentation JavaScript only')
+    print('PASS: upgraded mobile native menu and refreshed admin presentation JS only')
     raise SystemExit(0)
 
 old_html=html
@@ -155,6 +188,7 @@ body.console-active .an-chart[hidden]{display:none!important}
 body.console-active #panel-advanced>details,body.console-active #panel-advanced>form{flex:1;min-height:0}
 '''
 html=html.replace('</style>',style+'</style>',1)
+html=upgrade_mobile_menu(html)
 after=collections.Counter(re.findall(r'\bid="([^"]+)"',html))
 for identifier,count in before.items():
     assert after[identifier]==count,('altered existing control',identifier,count,after[identifier])
