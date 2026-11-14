@@ -14,3 +14,9 @@ with ZipFile("hare-machi-render.zip") as z:
  for name in ('static/island.css','static/polish.css'):
   css=z.read(name).decode('utf-8')
   print("CSS_END",name,css[-1500:])
+
+ for name in z.namelist():
+  if name.startswith('static/') and name.endswith('.js'):
+   txt=z.read(name).decode('utf-8',errors='replace')
+   found=[txt[max(0,m.start()-85):m.end()+140] for m in re.finditer(r'(?:\.font\s*=|fontFamily|font-family|fillText\s*\(|strokeText\s*\()',txt,re.I)]
+   if found:print('JS_FONT',name,found[:35])
