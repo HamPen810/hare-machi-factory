@@ -62,7 +62,10 @@ try{
   assert.ok(initial.doc<=initial.view+3,JSON.stringify({viewport,initial}));
   assert.ok(initial.body<=initial.view+3,JSON.stringify({viewport,initial}));
   const goto=async name=>{
-   if(viewport.width<=740)await page.selectOption('#admin-mobile-nav',name);
+   if(viewport.width<=740){
+    await page.click('#admin-mobile-toggle');
+    await page.click('#admin-mobile-options [data-mobile-target="'+name+'"]');
+   }
    else await page.click('[data-panel="'+name+'"]');
    await page.waitForFunction(name=>{
      const p=document.querySelector('#panel-'+name);
