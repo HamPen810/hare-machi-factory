@@ -235,7 +235,7 @@ function extraCharts(group){
  if(!host)return;
  const players=snapshot.players||[],market=snapshot.market||[],products=['white','sea','shisa'],labels=['標準','海坊主','シーサー'];
  if(group==='market-plus'){
-  g.append(chart('商品別の保有者数','現在の在庫が1個以上の参加者',products.map((id,i)=>({label:labels[i],value:players.filter(p=>(p.stock||[]).some(s=>s.product===id&&magnitude(s.quantity)>=0)).length}))));
+  g.append(chart('商品別の保有者数','現在の在庫が1個以上の参加者',products.map((id,i)=>({label:labels[i],value:players.filter(p=>(p.stock||[]).some(s=>s.product===id&&!/^0(?:\\.0*)?(?:e[+-]?\\d+)?$/i.test(String(s.quantity||'0')))).length}))));
   g.append(chart('出荷中の商品','現在の出品レコード件数',products.map((id,i)=>({label:labels[i],value:(snapshot.pending||[]).filter(p=>p.product===id).length}))));
   g.append(chart('市場の参加店舗','精算1回あたりの平均出店数',products.map((id,i)=>{const vals=market.filter(p=>p.product===id);return {label:labels[i],value:vals.length?vals.reduce((a,b)=>a+Number(b.sellers||0),0)/vals.length:0};})));
   g.append(chart('販売成立率','販売成立した精算回の割合（％）',products.map((id,i)=>{const vals=market.filter(p=>p.product===id);return {label:labels[i],value:vals.length?vals.filter(x=>Number(x.sold)>0||magnitude(x.sold)>0).length*100/vals.length:0};})));
@@ -295,6 +295,8 @@ function readLetter(kind){
  if(current.remove)target.append(current.remove);
 }
 function bulletin(){
+ const refresh=q('#notice-refresh-proxy');
+ if(refresh)refresh.addEventListener('click',()=>q('#bulletin-refresh')?.click());
  document.addEventListener('admin-bulletin-ready',()=>{enhance('posts');enhance('messages');});
  for(const kind of ['posts','messages']){
   if(q('#bulletin-admin-'+kind)?.querySelector('article'))enhance(kind);
