@@ -45,7 +45,7 @@ files['static/island.css']=css.encode('utf8')
 html=files['static/admin.html'].decode('utf8')
 assert 'id="panel-analysis"' in html
 assert "id=\"insight-lab\"" not in html
-style=Path('deployment/admin-insight-lab-20261114.css').read_text('utf8')
+style=Path('deployment/admin-insight-lab-20261114.css').read_text('utf8')+'\n'+Path('deployment/admin-time-studio-20261114.css').read_text('utf8')
 html=html.replace('</style>',style+'\\n</style>',1)
 src='<script src="/admin-cockpit.js" defer></script>'
 assert html.count(src)==1
