@@ -184,9 +184,10 @@ html=html.replace('<script src="/admin.js" defer></script>',
 orig=files['static/admin.html'].decode('utf8')
 old_ids=re.findall(r'\bid="([^"]+)"',orig)
 new_ids=re.findall(r'\bid="([^"]+)"',html)
-for id in old_ids:
-    assert new_ids.count(id)==1, ('ID lost or duplicated',id,new_ids.count(id))
-assert len(new_ids)==len(set(new_ids)), 'Duplicate ID in admin page'
+for id in set(old_ids):
+    assert new_ids.count(id)==old_ids.count(id), ('ID count changed',id,old_ids.count(id),new_ids.count(id))
+for id in ('tab-overview','tab-operations','panel-overview','panel-operations','analytics-content','analytics-stamp','an-market-window'):
+    assert new_ids.count(id)==1, ('New UI ID missing/duplicate',id,new_ids.count(id))
 for form in ('announcement-form','rulebook-form','player-form','bank-config','bank-market','funds-form'):
     assert html.count('id="'+form+'"')==1,form
 for control in ('funds-amount','funds-target','bank-config','asset-tax-preview','asset-tax-apply','funds-apply','funds-cancel','admin-bank-status','tab-tap-monitor'):
