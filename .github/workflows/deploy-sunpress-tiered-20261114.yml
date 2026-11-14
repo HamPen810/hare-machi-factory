@@ -1,0 +1,62 @@
+name: Deploy tiered Sunpress prices preserving legacy next purchase
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/apply-sunpress-tiered-20261114.py
+      - .github/workflows/deploy-sunpress-tiered-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  verify-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch server and UI with safe tiered prices
+        run: python deployment/apply-sunpress-tiered-20261114.py
+      - name: Assert boundaries and preserved balances, levels, and other equipment
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import ast,zipfile,types
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              market=z.read('market.py').decode('utf8')
+              js=z.read('static/app.js').decode('utf8')
+              for name in ('server.py','market.py','accounts.py'):
+                  ast.parse(z.read(name).decode('utf8'),filename=name)
+          t=ast.parse(market)
+          fns=[node for node in t.body if isinstance(node,ast.FunctionDef) and node.name in ('sunpress_step','sunpress_price')]
+          assert len(fns)==2
+          namespace={}
+          exec(compile(ast.Module(body=fns,type_ignores=[]),'<sunpress>','exec'),namespace)
+          cost=namespace['sunpress_price']
+          growth=namespace['sunpress_step']
+          for lv,step in ((0,5),(99,5),(100,5),(499,5),(500,10),(1999,10),(2000,12),(4999,12),(5000,15),(10000,15)):
+              assert growth(lv)==step,(lv,step)
+          assert cost(0)==50000
+          for lv in (0,1,99,499,500,501,1999,2000,2001,4999,5000,5001,12536):
+              assert cost(lv+1)==cost(lv)*growth(lv),lv
+              assert cost(lv,lv)==50000*5**lv,lv
+              assert cost(lv+1,lv)==50000*5**lv*growth(lv),lv
+              assert cost(lv+2,lv)==50000*5**lv*growth(lv)*growth(lv+1),lv
+          assert "cost=(sunpress_price(level,self._sunpress_anchor(p)) if kind=='sunpress'" in market
+          assert "else EQUIPMENT[kind][1]*5**level" in market
+          assert "item['next_growth']=sunpress_step(level)" in market
+          assert "kind==='sunpress'?BigInt(item.next_growth||5):5n" in js
+          assert "return 10**(r[0] if r else 0)" in market
+          assert "f['tap_power']=power(f['tier'])*10**levels.get('sunpress',0)" in market
+          assert "EQUIPMENT={'sunpress':('おひさまプレス',50000),'islandline':('南風オートライン',250000)}" in market
+          print('PASS: tier growth, migration anchor, display alignment, 10x power, no unrelated price changes')
+          PY
+      - name: Publish tested game ZIP for automatic Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Deploy tiered Sunpress prices with one protected legacy purchase"; git push; }
