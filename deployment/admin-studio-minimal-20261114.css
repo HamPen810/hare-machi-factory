@@ -1,3 +1,8 @@
+@font-face {
+ font-family:IslandRound;
+ src:local('HG丸ｺﾞｼｯｸM-PRO'),local('HGMaruGothicMPRO'),local('UD デジタル 教科書体 N-R');
+ font-display:swap;
+}
 /* HARE-MACHI / STUDIO CONSOLE — minimal visual layer.
    Strictly styling. Reuses the same typography stack as the game.
    Supports native 100dvh workspace and already implemented page controls. */
