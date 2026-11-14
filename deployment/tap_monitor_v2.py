@@ -115,6 +115,10 @@ def record(db,player,now,count,client_meta=None):
         flagged=now if score>=60 else d.get('flagged_at')
         # Event history is tiny and sparse: one event per 6h at most.
         if score>=60 and (not last_event or now-last_event>=EVENT_COOLDOWN_MS):
+            # Reclaim old sparse events on an infrequent flagged write.
+            # This adds no periodic jobs and no network requests.
+            db.execute("DELETE FROM tap_monitor_events WHERE detected_at<?",
+                       (now-30*86400000,))
             db.execute(
                 "INSERT INTO tap_monitor_events(player,detected_at,score,reasons,"
                 "taps_1m,taps_5m,taps_30m,rate_5m,rate_30m,client_samples)"
