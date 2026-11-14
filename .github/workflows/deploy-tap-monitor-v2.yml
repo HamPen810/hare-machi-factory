@@ -1,0 +1,86 @@
+name: Deploy bandwidth-capped autoclicker detection v2
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/tap_monitor_v2.py
+      - deployment/install-tap-monitor-v2.py
+      - .github/workflows/deploy-tap-monitor-v2.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify bounded 1/5/30 minute aggregation and non-punitive persistence
+        run: |
+          python - <<'PY'
+          import sys,sqlite3,time
+          sys.path.insert(0,'deployment')
+          import tap_monitor_v2 as m
+          db=sqlite3.connect(':memory:')
+          db.row_factory=sqlite3.Row
+          db.executescript("""
+          CREATE TABLE tap_monitor_state(player TEXT PRIMARY KEY,started_at BIGINT,
+           last_at BIGINT,request_count INT,tap_count BIGINT,gaps_json TEXT,score INT,
+           reasons TEXT,flagged_at BIGINT,avg_interval_ms REAL,cv REAL,rate REAL,
+           rollups_json TEXT DEFAULT '[]',client_samples INT DEFAULT 0,
+           client_regular_samples INT DEFAULT 0,last_event_at BIGINT);
+          CREATE TABLE tap_monitor_events(player TEXT,detected_at BIGINT,score INT,
+           reasons TEXT,taps_1m INT,taps_5m INT,taps_30m INT,
+           rate_5m REAL,rate_30m REAL,client_samples INT);
+          """)
+          start=1800000000000
+          for i in range(650):
+              m.record(db,'normal',start+i*750,1,None)
+          n=db.execute("SELECT * FROM tap_monitor_state WHERE player='normal'").fetchone()
+          assert n and n['score']<60,n['score'] if n else None
+          assert db.execute("SELECT count(*) FROM tap_monitor_events").fetchone()[0]==0
+          for i in range(640):
+              m.record(db,'fast',start+i*480,20,[20,120,10,20] if i%16==0 else None)
+          q=db.execute("SELECT * FROM tap_monitor_state WHERE player='fast'").fetchone()
+          assert q and q['score']>=60,(q['score'],q['reasons']) if q else None
+          count=db.execute("SELECT count(*) FROM tap_monitor_events WHERE player='fast'").fetchone()[0]
+          assert count==1,count
+          assert len(__import__('json').loads(q['rollups_json']))<=30
+          assert q['client_samples']>=8
+          print('PASS normal safe, fast flagged, 6h event throttling, bounded rollups')
+          PY
+      - name: Patch production archive
+        run: python deployment/install-tap-monitor-v2.py
+      - name: Validate compiled production code and security boundary
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import ast,zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              for name in ('market.py','server.py','tap_monitor_v1.py','tap_monitor_v2.py'):
+                  ast.parse(z.read(name).decode('utf8'))
+              market=z.read('market.py').decode()
+              app=z.read('static/app.js').decode()
+              server=z.read('server.py').decode()
+              admin=z.read('static/admin.js').decode()
+              html=z.read('static/admin.html').decode()
+          assert 'tap_monitor_v2.record(self.db,p,now,count,tap_meta)' in market
+          assert "return 10**(r[0] if r else 0)" in market
+          assert "sunpress_price(level,self._sunpress_anchor(p))" in market
+          assert 'tapTelemetrySeq%16===0' in app
+          assert '/api/admin/tap-monitor-events' in server
+          assert server.index('if not admin.authorized')<server.index("if not write and self.path=='/api/admin/tap-monitor-events'")
+          assert 'tap-monitor-events' in admin and 'tap-monitor-events' in html
+          assert 'tap_monitor_v2.record' not in server
+          print('PASS archive, prices, 10x multiplier, admin auth, sampled telemetry')
+          PY
+      - name: Commit verified game bundle for Render deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Deploy bandwidth-capped multi-window autoclicker analytics"; git push; }
