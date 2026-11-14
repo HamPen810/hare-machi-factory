@@ -1,0 +1,43 @@
+/* Studio v4: calmer editorial palette and interactive time traveler */
+body.console-active {
+ --hm-bg:#f0f2f3;--hm-paper:#fff;--hm-ink:#243238;
+ --hm-muted:#70818a;--hm-accent:#176e78;--hm-accent-soft:#e6f1f0;
+ --hm-line:#e2e7e9;--hm-dark:#1a2b35;
+ --hm-shadow:0 7px 32px rgba(24,44,51,.055);
+}
+body.console-active #dashboard>.tabs{background:linear-gradient(165deg,#1a2b35,#243943);border-color:#2c4047}
+body.console-active #dashboard>.tabs button[aria-selected=true]{color:#1a4650;background:#f5f8f9}
+body.console-active #dashboard>section[role=tabpanel]{background:#fff;border-color:#e0e7e9}
+body.console-active .console-hero{background:#eff4f2;color:#273f43;border-color:#e3ebe8}
+body.console-active .lab-kicker{color:#a56f46}
+body.console-active .lab-heading,body.console-active .lab-title{letter-spacing:.025em}
+body.console-active .lab-tab[aria-pressed=true]{background:#e9f1f2;border-color:#bfd8db;color:#1e606c}
+body.console-active .lab-chart-kind{background:#f6ede3;color:#a06939}
+body.console-active .lab-svg text{font-size:16px}
+body.console-active .lab-card{border-radius:13px;background:#fff;border-color:#e1e9ec;box-shadow:0 8px 24px rgba(29,61,74,.05)}
+body.console-active .lab-timeline{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;background:#f5f8f8;border:1px solid #e0e9e9;border-radius:11px;padding:9px 13px}
+body.console-active .lab-timeline[hidden]{display:none!important}
+body.console-active .lab-timeline-head{display:flex;align-items:center;justify-content:space-between;gap:9px}
+body.console-active .lab-timeline-title{font-size:13px;color:#244451;font-weight:800}
+body.console-active .lab-time-label{color:#627d83;font-size:12px;font-variant-numeric:tabular-nums}
+body.console-active .lab-timeline-row{display:flex;align-items:center;gap:11px;min-height:32px}
+body.console-active .lab-play{flex:0 0 90px;min-height:32px;background:#203c47;color:#fff;border:0;border-radius:8px;font-size:12px;white-space:nowrap;cursor:pointer}
+body.console-active .lab-play[aria-pressed=true]{background:#a76d48}
+body.console-active .lab-slider{flex:1;min-width:0;height:8px;padding:0;margin:0;accent-color:#247b80;cursor:pointer;box-shadow:none;border:0}
+body.console-active .lab-time-edge{font-size:11px;color:#6c8388;white-space:nowrap}
+body.console-active .lab-nav-btn{color:#215b64;border-color:#ccdcdf;background:#f8fafb}
+body.console-active .lab-nav-btn:hover{background:#e6f1f1}
+@media(max-width:740px){
+ body.console-active .lab-timeline{padding:7px 8px;gap:3px}
+ body.console-active .lab-timeline-title{font-size:11px}
+ body.console-active .lab-time-label{font-size:10px}
+ body.console-active .lab-play{flex-basis:65px;font-size:10px;padding:4px}
+ body.console-active .lab-timeline-row{gap:5px}
+ body.console-active .lab-time-edge{font-size:9px;max-width:60px;white-space:normal;line-height:1.2}
+ body.console-active .lab-svg text{font-size:15px}
+}
+@media(max-height:650px){
+ body.console-active .lab-timeline{gap:2px;padding:5px 8px}
+ body.console-active .lab-timeline-row{min-height:26px}
+ body.console-active .lab-play{min-height:26px}
+}
