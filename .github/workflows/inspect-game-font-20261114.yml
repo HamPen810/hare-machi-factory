@@ -1,0 +1,17 @@
+name: Inspect exact game font for admin design
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/inspect-game-font-20261114.py
+      - .github/workflows/inspect-game-font-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the packaged game's real typography CSS
+        run: python deployment/inspect-game-font-20261114.py
