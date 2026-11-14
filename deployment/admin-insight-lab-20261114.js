@@ -56,7 +56,7 @@ function histogram(a,title){
  const p=axis(g,[min,max],[0,...bins],['金額の桁数（符号付き対数）','人数']);
  bins.forEach((count,i)=>{const x1=p.X(min+(max-min)*i/n),x2=p.X(min+(max-min)*(i+1)/n),r=N('rect',{x:x1+2,y:p.Y(count),width:x2-x1-4,height:Math.max(0,p.Y(0)-p.Y(count)),fill:'#138e88',rx:3});r.append(N('title',{},count+'人'));g.append(r);});return g;
 }
-function donut(items,title){
+function donut(items,title,unit='人'){
  const g=svg(title),arr=items.filter(v=>v.n>0),total=arr.reduce((s,v)=>s+v.n,0);
  if(!total){txt(g,300,200,'データなし');return g;}
  let a=-Math.PI/2;const cx=260,cy=190,ro=130,ri=82;
@@ -64,10 +64,10 @@ function donut(items,title){
  arr.forEach((p,i)=>{
   const d=2*Math.PI*p.n/total,b=a+d,large=d>Math.PI?1:0,start=pt(ro,a),end=pt(ro,b),innerEnd=pt(ri,b),innerStart=pt(ri,a);
   const path=N('path',{d:'M'+start+' A'+ro+' '+ro+' 0 '+large+' 1 '+end+' L'+innerEnd+' A'+ri+' '+ri+' 0 '+large+' 0 '+innerStart+' Z',fill:C[i%C.length]});
-  path.append(N('title',{},p.label+'：'+p.n+'人（'+(p.n/total*100).toFixed(1)+'%）'));g.append(path);a=b;
+  path.append(N('title',{},p.label+'：'+p.n+unit+'（'+(p.n/total*100).toFixed(1)+'%）'));g.append(path);a=b;
  });
- txt(g,cx,194,total+'人',29,{'font-weight':800,'text-anchor':'middle',fill:'#24434b'});
- arr.forEach((p,i)=>{const y=74+i*36;g.append(N('rect',{x:458,y:y-12,width:16,height:16,rx:3,fill:C[i%C.length]}));txt(g,484,y,p.label+' '+p.n+'人',14);});
+ txt(g,cx,194,total.toLocaleString('ja-JP')+unit,29,{'font-weight':800,'text-anchor':'middle',fill:'#24434b'});
+ arr.forEach((p,i)=>{const y=74+i*36;g.append(N('rect',{x:458,y:y-12,width:16,height:16,rx:3,fill:C[i%C.length]}));txt(g,484,y,p.label+' '+p.n.toLocaleString('ja-JP')+unit,14);});
  return g;
 }
 function scatter(xy,title,xlabel,ylabel){
@@ -166,10 +166,20 @@ function charts(){
   ['クラス別の経営力','レーダーチャート',radar,'クラス別中央値の相対的な順位スコア。絶対的な能力値ではありません。'],
   ['製造トップの売上','ドットプロット',()=>dotplot([...all].sort((a,b)=>datum(b,'manufactured')-datum(a,'manufactured')).slice(0,10).map(p=>({name:p.display_name,y:Math.max(0,datum(p,'revenue'))})),'製造トップの売上'),'製造数上位10名の売上規模をドットで比較。']
  ];
+ function marketMix(){
+  const logs=products.map(id=>{
+   const entries=ms().filter(v=>v.product===id&&String(v.sold||'0')!=='0').map(v=>signedLog(v.sold)).filter(x=>x>0);
+   if(!entries.length)return -Infinity;
+   let total=-Infinity;
+   for(const x of entries)total===-Infinity?total=x:total=Math.max(total,x)+Math.log10(1+10**(-Math.abs(total-x)));
+   return total;
+  });
+  const top=Math.max(...logs);return products.map((id,i)=>({label:productsName[i],n:Number.isFinite(top)&&Number.isFinite(logs[i])?Math.round(10000*10**(logs[i]-top)):0}));
+ }
  const market=[
   ['市場の価格推移','折れ線',()=>line(series('average_price'),'市場の平均価格','平均価格（桁）'),'商品別・直近48回の精算の平均価格。'],
   ['市場の販売数推移','折れ線',()=>line(series('sold'),'市場の販売数','販売数（桁）'),'巨大な数値は対数表示。商品別の精算順を描画。'],
-  ['精算時点までの売れ筋構成','ドーナツグラフ',()=>donut(products.map((k,i)=>({label:productsName[i],n:ms().filter(v=>v.product===k).reduce((sum,v)=>sum+Math.max(0,Number(v.sold)>1e9?1e9:Number(v.sold)||0),0)})),'売れ筋構成（件数上限付き）'),'市場履歴を指定した時点まで集計。極端に大きな販売数は1レコードあたり10億個で表示上限。'],
+  ['精算時点までの売れ筋構成','ドーナツグラフ',()=>donut(marketMix(),'売れ筋構成（相対比）','指数'),'指定時点までの販売個数を桁数で安全に合算した相対構成。中央の指数は相対値で実際の販売個数ではありません。'],
   ['精算別の販売量分布','ヒストグラム',()=>histogram(ms().map(v=>signedLog(v.sold)),'精算別の販売量分布'),'指定した時点までの精算履歴の販売数（桁数）を分布化。'],
   ['市場の供給・販売相関','散布図',()=>scatter(ms().map(v=>[signedLog(v.offered),signedLog(v.sold)]),'市場の供給と販売の相関','出品量の桁数','販売量の桁数'),'指定した時点までの精算結果を散布図で表示。標本数は各商品の精算行数。'],
   ['商品保有者の内訳','ドーナツグラフ',()=>donut(products.map((k,i)=>({label:productsName[i],n:all.filter(p=>(p.stock||[]).some(s=>s.product===k&&signedLog(s.quantity)>0)).length})),'商品保有者の内訳'),'現在の在庫スナップショット。時間スライダーの影響は受けません。複数商品保有は重複計上。'],
