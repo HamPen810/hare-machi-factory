@@ -13,6 +13,9 @@ print('=== ADMIN PAGE SECTION SHORT CONTENT ===')
 for id in re.findall(r'<section id="(panel-[^"]+)"',h):
     pos=h.find('id="'+id+'"')
     print(id,repr(re.sub('<[^>]+>',' ',h[pos:pos+260])[:220]))
+print('=== OPERATIONS FULL MARKUP ===')
+q=h.find('<section id="panel-operations"')
+print(h[q:q+10000])
 print('=== BULLETIN HTML ===')
 for match in list(re.finditer(r'(bulletin|message|notice|announcement|お知らせ|メッセージ)',h,re.I))[:35]:
     print(match.group(),repr(h[max(0,match.start()-170):match.start()+350]))
