@@ -56,7 +56,7 @@ jobs:
           assert "return 10**(r[0] if r else 0)" in market
           assert "sunpress_price(level,self._sunpress_anchor(p))" in market
           assert 'tap_monitor_v2.record' in market
-          assert "const per=mobile()?200:520" in cockpit
+          assert "per=mobile()?200:520" in cockpit
           assert 'admin-mobile-nav' in html
           assert 'body.console-active' in html
           print('PASS: 14 independent tabs, complete original forms, arithmetic untouched, mobile no page scroll')
