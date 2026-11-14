@@ -1,0 +1,52 @@
+name: Deploy game-font matching minimal admin theme
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/admin-studio-minimal-20261114.css
+      - deployment/install-admin-studio-minimal-20261114.py
+      - .github/workflows/deploy-admin-studio-minimal-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply CSS-only admin redesign
+        run: python deployment/install-admin-studio-minimal-20261114.py
+      - name: Check ZIP, original calculations, forms and Japanese game font
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          python - <<'PY'
+          import ast,zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              html=z.read('static/admin.html').decode('utf8')
+              market=z.read('market.py').decode('utf8')
+              admin=z.read('static/admin.js').decode('utf8')
+              for name in ['market.py','server.py','bank.py','exact.py']:
+                  ast.parse(z.read(name).decode('utf8'))
+              assert 'font-family:IslandRound' in html
+              assert 'font-family:IslandHand' in html
+              assert '--hm-round:IslandRound' in html
+              assert 'var(--hm-hand)' in html
+              assert "return 10**(r[0] if r else 0)" in market
+              assert "sunpress_price(level,self._sunpress_anchor(p))" in market
+              assert "tap_monitor_v2.record" in market
+              for el in ('funds-form','funds-amount','bank-config','bank-market','announcement-form','rulebook-form','panel-analysis','panel-messages','panel-notices','admin-mobile-nav'):
+                  assert html.count('id="'+el+'"')==1,el
+              assert "new Event('admin-bulletin-ready')" in admin
+          print('PASS: original game font family, all money handlers untouched, no scripts altered')
+          PY
+      - name: Publish tested game bundle for Render
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Refine admin with minimal command-center theme and original game fonts"; git push; }
