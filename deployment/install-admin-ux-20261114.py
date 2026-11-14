@@ -212,11 +212,15 @@ js=js.replace(old,
     "function render(){window.__adminDashboardSnapshot=data;document.dispatchEvent(new CustomEvent('admin-dashboard-ready',{detail:data}));const s=data.summary;",1)
 # Correct a duplicated read-only monitor-history renderer left by a prior
 # repeated deploy. No finance, settings or moderation handler is modified.
-pattern=r"  const history=await api\\('tap-monitor-events'\\);.*?   \\]\\)\\);"
-blocks=list(re.finditer(pattern,js,re.S))
-assert len(blocks)==2, ('Unexpected existing history render count',len(blocks))
-assert blocks[0].group(0)==blocks[1].group(0), 'History blocks diverged'
-js=js[:blocks[1].start()]+js[blocks[1].end():]
+needle="  const history=await api('tap-monitor-events');"
+assert js.count(needle)==2, ('Unexpected existing history render count',js.count(needle))
+start1=js.index(needle)
+start2=js.index(needle,start1+len(needle))
+terminator="   ]));"
+end1=js.index(terminator,start1)+len(terminator)
+end2=js.index(terminator,start2)+len(terminator)
+assert js[start1:end1]==js[start2:end2], 'History render blocks diverged'
+js=js[:start2]+js[end2:]
 files['static/admin.js']=js.encode('utf8')
 
 # Serve one extra cacheable JS file. No new API endpoints or database queries.
