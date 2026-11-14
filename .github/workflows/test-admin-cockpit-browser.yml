@@ -1,0 +1,42 @@
+name: Browser-check no-scroll admin cockpit on desktop and phones
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/test-admin-cockpit-browser.cjs
+      - .github/workflows/test-admin-cockpit-browser.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser test runtime (CI only, not game server)
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install chromium
+      - name: Extract production UI into localhost test directory
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          d=Path('/tmp/gameadmin');d.mkdir(exist_ok=True)
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in ('admin.html','admin.js','admin-ux.js','admin-cockpit.js','numbers.js','tabs.js'):
+                  (d/name).write_bytes(z.read('static/'+name))
+          print('Local test assets:',[x.name for x in d.iterdir()])
+          PY
+          nohup python3 -m http.server 8768 --bind 127.0.0.1 --directory /tmp/gameadmin >/tmp/admin-web.log 2>&1 &
+          sleep 2
+      - name: Verify actual desktop and mobile viewport rendering and functionality
+        run: node deployment/test-admin-cockpit-browser.cjs
+      - name: Upload screenshots if browser check fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-cockpit-failure-screenshots
+          path: /tmp/admin-*.png
+          if-no-files-found: ignore
