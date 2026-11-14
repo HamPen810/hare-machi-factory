@@ -1,0 +1,69 @@
+name: Deploy responsive no-scroll admin command deck
+on:
+  push:
+    branches: [main]
+    paths:
+      - deployment/admin-cockpit-20261114.css
+      - deployment/admin-cockpit-20261114.js
+      - deployment/install-admin-cockpit-20261114.py
+      - .github/workflows/deploy-admin-cockpit-20261114.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-bundle-update-main
+  cancel-in-progress: false
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Check standalone console JS
+        run: node --check deployment/admin-cockpit-20261114.js
+      - name: Apply safe admin presentation patch
+        run: python deployment/install-admin-cockpit-20261114.py
+      - name: Validate all admin front-end scripts and preserved game code
+        run: |
+          python -m zipfile -t hare-machi-render.zip
+          for f in admin.js admin-ux.js admin-cockpit.js numbers.js; do
+            unzip -p hare-machi-render.zip static/$f > /tmp/check-$f
+            node --check /tmp/check-$f
+          done
+          python - <<'PY'
+          import ast,zipfile,re,html.parser
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              server=z.read('server.py').decode('utf8')
+              html=z.read('static/admin.html').decode('utf8')
+              adminjs=z.read('static/admin.js').decode('utf8')
+              ux=z.read('static/admin-ux.js').decode('utf8')
+              cockpit=z.read('static/admin-cockpit.js').decode('utf8')
+              market=z.read('market.py').decode('utf8')
+              bank=z.read('bank.py').decode('utf8')
+              exact=z.read('exact.py').decode('utf8')
+          for src in (server,market,bank,exact):ast.parse(src)
+          for panel in ('overview','analysis','notices','messages','players','online','hybrid','rankings','market','bank','funds','tap-monitor','operations','advanced'):
+              assert 'id="panel-'+panel+'"' in html,panel
+              assert 'data-panel="'+panel+'"' in html,panel
+          for form in ('announcement-form','funds-form','bank-config','bank-market','bulk-funds-form','player-form','rulebook-form'):
+              assert len(re.findall(r'id="'+form+'"',html))==1,form
+          for identifier in ('asset-tax-preview','asset-tax-apply','funds-apply','funds-cancel','bulk-apply','bulk-cancel','bulletin-admin-posts','bulletin-admin-messages','bulletin-refresh','extra-slots-section'):
+              assert 'id="'+identifier+'"' in html,identifier
+          assert "new Event('admin-bulletin-ready')" in adminjs
+          assert "const shown=$('#panel-analysis')" in ux
+          assert "'/admin-cockpit.js':'admin-cockpit.js'" in server
+          assert "return 10**(r[0] if r else 0)" in market
+          assert "sunpress_price(level,self._sunpress_anchor(p))" in market
+          assert 'tap_monitor_v2.record' in market
+          assert "const per=mobile()?200:520" in cockpit
+          assert 'admin-mobile-nav' in html
+          assert 'body.console-active' in html
+          print('PASS: 14 independent tabs, complete original forms, arithmetic untouched, mobile no page scroll')
+          PY
+      - name: Publish verified ZIP for Render auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Deploy fixed-viewport admin cockpit with inbox drilldown and expanded analytics"; git push; }
