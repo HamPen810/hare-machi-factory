@@ -25,7 +25,7 @@ jobs:
           from pathlib import Path
           d=Path('/tmp/gameadmin');d.mkdir(exist_ok=True)
           with ZipFile('hare-machi-render.zip') as z:
-              for name in ('admin.html','admin.js','admin-ux.js','admin-cockpit.js','numbers.js','tabs.js'):
+              for name in ('admin.html','admin.js','admin-ux.js','admin-cockpit.js','admin-insight-lab.js','numbers.js','tabs.js'):
                   (d/name).write_bytes(z.read('static/'+name))
           print('Local test assets:',[x.name for x in d.iterdir()])
           PY
