@@ -1,4 +1,4 @@
-/* Browser smoke test of existing admin logic plus the new responsive cockpit. */
+/* Browser smoke test of existing admin logic plus the new responsive cockpit.\n   Re-run for minimal IslandRound/IslandHand visual redesign. */
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 
