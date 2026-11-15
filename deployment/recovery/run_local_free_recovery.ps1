@@ -37,6 +37,12 @@ Invoke-WebRequest -Uri ($uri + 'compact_restored_db.py') -OutFile $compact
 $env:PGHOST='127.0.0.1'
 $env:PGUSER=$LocalPgUser
 $env:PGPORT=$PgPort
+if (-not $env:PGPASSWORD) {
+  $passwordSecure = Read-Host 'LOCAL PostgreSQL password (not Supabase)' -AsSecureString
+  $passwordPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwordSecure)
+  try { $env:PGPASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPtr) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPtr) }
+}
 Write-Host 'Validating verified backup and restoring into NEW local-only PostgreSQL DB.'
 $restoreOutput = & python -u $audit $Backup --sha256 $ExpectedSha --restore 2>&1
 if ($LASTEXITCODE -ne 0) {
