@@ -1,5 +1,10 @@
 name: Encrypted cloud-only backup and disposable PostgreSQL recovery test
 on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/cloud-encrypted-recovery.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,6 +36,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "${PROD_URL:-}" || -z "${RECOVERY_PASSPHRASE:-}" ]]; then
+            echo "RECOVERY_BLOCKED_MISSING_SECRETS_NO_DATABASE_ACCESSED"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           python - <<'PY'
           import os,sys
           from urllib.parse import urlsplit,parse_qs,unquote
