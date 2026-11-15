@@ -1,0 +1,42 @@
+name: Verify local-only backup audit helper (no production access)
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - deployment/recovery/audit_local_backup.py
+      - .github/workflows/test-local-recovery-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated restore safety guards
+        run: |
+          python -m py_compile deployment/recovery/audit_local_backup.py
+          python - <<'PY'
+          import importlib.util, tempfile, pathlib, hashlib, unittest.mock
+          p='deployment/recovery/audit_local_backup.py'
+          spec=importlib.util.spec_from_file_location('audit_local_backup',p)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          for host in ('db.xnqvygduplopkkhnrbis.supabase.co','0.0.0.0','192.9.170.181',''):
+              try:mod.assert_local(host)
+              except ValueError:pass
+              else:raise AssertionError('remote host accepted: '+host)
+          for host in ('localhost','127.0.0.1','::1'):
+              mod.assert_local(host)
+          with tempfile.TemporaryDirectory() as root:
+              backup=pathlib.Path(root,'fake.dump')
+              backup.write_bytes(b'fake-backup-not-a-real-pg-dump')
+              good=hashlib.sha256(backup.read_bytes()).hexdigest()
+              try:mod.verify_backup(backup,'0'*64)
+              except ValueError:pass
+              else:raise AssertionError('incorrect hash accepted')
+              with unittest.mock.patch.object(mod,'run',return_value='1; fake entry\n'):
+                  assert '1;' in mod.verify_backup(backup,good)
+          print('PASS: no remote DB, SHA256 required, no writes, isolated restore gate')
+          PY
