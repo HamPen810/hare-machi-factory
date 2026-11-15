@@ -16,7 +16,7 @@ jobs:
         run: |
           python - <<'PY'
           import socket, ssl, urllib.request, urllib.error
-          endpoints=[("haremachi.duckdns.org",25565),("192.9.170.181",25565)]
+          endpoints=[("haremachi.duckdns.org",25565),("192.9.170.181",25565),("192.9.170.181",22),("192.9.170.181",443)]
           for host,port in endpoints:
               try:
                   with socket.create_connection((host,port),timeout=7):
