@@ -40,9 +40,9 @@ for entry, raw in info_content:
         continue
     text = raw.decode("utf-8")
     for old, new, label in ((OLD_IDLE, NEW_IDLE, "idle minute"), (OLD_AGG, NEW_AGG, "empty aggregate")):
+        if new in text:
+            continue  # Already patched; checked BEFORE searching for old inside new.
         if text.count(old) != 1:
-            if new in text and old not in text:
-                continue  # Already patched; safe for reruns.
             raise RuntimeError(f"Unexpected {label} source: no changes written")
         text = text.replace(old, new)
     compile(text, "market.py", "exec")
