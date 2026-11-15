@@ -1,11 +1,5 @@
 name: Encrypted cloud-only backup and disposable PostgreSQL recovery test
 on:
-  push:
-    branches:
-      - diagnostics/storage-growth-20261115
-    paths:
-      - .github/workflows/cloud-encrypted-recovery.yml
-      - deployment/recovery/compact_restored_db.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -111,21 +105,26 @@ jobs:
           WORK="$RUNNER_TEMP/hare-recovery"
           export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=tester PGPASSWORD=tester
           DB=hare_recovery_audit_0123456789
-          createdb "$DB"
-          pg_restore --no-owner --no-privileges --exit-on-error \
-            -d "$DB" "$WORK/source.dump"
+          docker run --rm --network host -e PGPASSWORD=tester postgres:17 createdb -h 127.0.0.1 -U tester "$DB"
+          docker run --rm --network host -e PGPASSWORD=tester -v "$WORK:/work" postgres:17 \
+            pg_restore -h 127.0.0.1 -U tester --no-owner --no-privileges --exit-on-error \
+            -d "$DB" /work/source.dump
           python deployment/recovery/compact_restored_db.py \
             --host 127.0.0.1 --db "$DB" --apply --archive-confirmed
-          psql -X -v ON_ERROR_STOP=1 -d "$DB" -c 'VACUUM FULL hare_factory.actions'
-          psql -X -v ON_ERROR_STOP=1 -d "$DB" -c 'VACUUM FULL hare_factory.market_ticks'
-          SIZE=$(psql -X -At -d "$DB" -c "SELECT pg_database_size(current_database())")
+          docker run --rm --network host -e PGPASSWORD=tester postgres:17 \
+            psql -h 127.0.0.1 -U tester -X -v ON_ERROR_STOP=1 -d "$DB" -c 'VACUUM FULL hare_factory.actions'
+          docker run --rm --network host -e PGPASSWORD=tester postgres:17 \
+            psql -h 127.0.0.1 -U tester -X -v ON_ERROR_STOP=1 -d "$DB" -c 'VACUUM FULL hare_factory.market_ticks'
+          SIZE=$(docker run --rm --network host -e PGPASSWORD=tester postgres:17 \
+            psql -h 127.0.0.1 -U tester -X -At -d "$DB" -c "SELECT pg_database_size(current_database())")
           echo "POST_COMPACTION_DATABASE_BYTES=$SIZE"
           printf '%s\n' "$SIZE" > "$WORK/size.txt"
           if (( SIZE >= 460*1024*1024 )); then
             echo "FREE_PLAN_TARGET_NOT_YET_MET; no production writes"
             exit 0
           fi
-          pg_dump -Fc -Z 6 -n hare_factory -d "$DB" -f "$WORK/compacted.dump"
+          docker run --rm --network host -e PGPASSWORD=tester -v "$WORK:/work" postgres:17 \
+            pg_dump -h 127.0.0.1 -U tester -Fc -Z 6 -n hare_factory -d "$DB" -f /work/compacted.dump
           printf '%s' "$RECOVERY_PASSPHRASE" > "$WORK/.secret"
           gpg --batch --yes --pinentry-mode loopback \
             --passphrase-file "$WORK/.secret" --symmetric --cipher-algo AES256 \
