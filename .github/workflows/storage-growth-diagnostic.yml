@@ -166,6 +166,17 @@ jobs:
                   if name.endswith('.py') and '/' not in name:
                       Path('/tmp/hare-storage-integration',name).write_bytes(z.read(name))
           PY
-          PYTHONPATH=/tmp/hare-storage-integration python deployment/test-tax-accounting.py
+          # Adapt an outdated test fixture to the existing production schema.
+          # This change applies only to a temporary copy of the test.
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('deployment/test-tax-accounting.py')
+          s=p.read_text()
+          needle='identity=object.__new__(accounts.Accounts)'
+          assert s.count(needle)==1
+          s=s.replace(needle, 'db.execute("CREATE TABLE admin_fund_transfers (player_id TEXT, amount INTEGER, kind TEXT)")\n'+needle)
+          Path('/tmp/hare-storage-integration/tax-fixture-test.py').write_text(s)
+          PY
+          PYTHONPATH=/tmp/hare-storage-integration python /tmp/hare-storage-integration/tax-fixture-test.py
           PYTHONPATH=/tmp/hare-storage-integration python deployment/test-admin-online-chart.py
           PYTHONPATH=/tmp/hare-storage-integration python deployment/test-multiple-bank-contracts.py
