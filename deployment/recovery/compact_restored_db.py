@@ -89,7 +89,7 @@ def main():
     totals = {"scanned": 0, "compressed": 0, "saved_text_bytes": 0}
     # Independent reader and writer: reader cursor snapshot remains stable while
     # the writer batches changed records on this fresh, offline restoration.
-    with psycopg.connect(**target) as reader, psycopg.connect(**target) as writer:
+    with psycopg.connect(**target) as reader, psycopg.connect(**target, autocommit=True) as writer:
         reader.execute("SET search_path TO hare_factory, pg_catalog")
         writer.execute("SET search_path TO hare_factory, pg_catalog")
         with reader.cursor(name="tap_result_read") as cur:
@@ -118,7 +118,7 @@ def main():
                     print("PROGRESS", json.dumps(totals))
     print("ACTION_COMPRESSION", json.dumps(totals))
 
-    with psycopg.connect(**target) as conn:
+    with psycopg.connect(**target, autocommit=True) as conn:
         with conn.transaction():
             # For the explicitly authorized old rounds only.
             deleted = conn.execute(
