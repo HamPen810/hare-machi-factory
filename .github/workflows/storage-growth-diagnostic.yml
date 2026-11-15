@@ -79,3 +79,30 @@ jobs:
               assert z.testzip() is None
               print("REPEAT_PATCH_OK")
           PY
+
+      - name: Test zero-listing settlement against isolated SQLite fixture
+        run: |
+          python - <<'PY'
+          import ast, sqlite3, types, zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              src=z.read('market.py').decode()
+          module=ast.parse(src)
+          game=next(node for node in module.body if isinstance(node,ast.ClassDef) and node.name=='Game')
+          method=next(node for node in game.body if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)) and node.name=='settle')
+          env={'CLOSE_MS':10**18}
+          exec(compile(ast.Module(body=[method],type_ignores=[]),'market.py','exec'),env)
+          db=sqlite3.connect(':memory:')
+          db.row_factory=sqlite3.Row
+          db.executescript('''
+            CREATE TABLE market_cursor(id INTEGER PRIMARY KEY,last INTEGER);
+            CREATE TABLE listings(id TEXT,round INTEGER);
+            CREATE TABLE market_ticks(round INTEGER,product TEXT,player TEXT,sold INTEGER,revenue INTEGER,inventory INTEGER,cost INTEGER);
+            INSERT INTO market_cursor VALUES(1,1200);
+          ''')
+          fake=types.SimpleNamespace(db=db,clock=lambda:1210*60000,accounts=types.SimpleNamespace(postgres=True))
+          assert env['settle'](fake,background=True) is False
+          assert db.execute('SELECT last FROM market_cursor').fetchone()[0]==1209
+          assert db.execute('SELECT COUNT(*) FROM market_ticks').fetchone()[0]==0
+          assert env['settle'](fake,background=True) is None
+          print('IDLE_MARKET_NO_INSERTS_AND_CURSOR_ADVANCES_OK')
+          PY
