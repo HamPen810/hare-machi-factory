@@ -1,0 +1,49 @@
+name: Diagnose Oracle VM free PostgreSQL destination
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/diagnose-oracle-free-db.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-only-vm-check:
+    runs-on: ubuntu-latest
+    env:
+      ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+      ORACLE_SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
+      ORACLE_SSH_HOST_KEY: ${{ secrets.ORACLE_SSH_HOST_KEY }}
+    steps:
+      - name: Check whether secure access is configured
+        id: check
+        run: |
+          if [[ -z "$ORACLE_SSH_PRIVATE_KEY" || -z "$ORACLE_SSH_USER" || -z "$ORACLE_SSH_HOST_KEY" ]]; then
+            echo "SSH_NOT_CONFIGURED: set ORACLE_SSH_PRIVATE_KEY, ORACLE_SSH_USER and ORACLE_SSH_HOST_KEY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "SSH_CONFIGURED"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Read-only disk and PostgreSQL status on Oracle VM
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > ~/.ssh/id_oracle
+          printf '%s\n' "$ORACLE_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_oracle ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_oracle -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=1 "${ORACLE_SSH_USER}@192.9.170.181" 'sh -s' <<'REMOTE'
+          set -eu
+          echo "VM_CONNECTED"
+          uname -s -m
+          df -h /
+          if command -v psql >/dev/null 2>&1; then psql --version; else echo "POSTGRES_CLIENT_MISSING"; fi
+          if command -v pg_config >/dev/null 2>&1; then pg_config --version; else echo "POSTGRES_SERVER_TOOLS_MISSING"; fi
+          if command -v systemctl >/dev/null 2>&1; then
+            systemctl is-active postgresql || true
+          fi
+          REMOTE
+          echo "READ_ONLY_VM_AUDIT_OK"
