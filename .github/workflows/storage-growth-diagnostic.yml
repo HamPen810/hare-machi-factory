@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/storage-growth-diagnostic.yml
       - deployment/reduce-idle-market-ticks.py
+      - deployment/reduce-tap-result-size.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -105,4 +106,51 @@ jobs:
           assert db.execute('SELECT COUNT(*) FROM market_ticks').fetchone()[0]==0
           assert env['settle'](fake,background=True) is None
           print('IDLE_MARKET_NO_INSERTS_AND_CURSOR_ADVANCES_OK')
+          PY
+
+      - name: Verify tap idempotency codec and expense SQL compatibility
+        run: |
+          python deployment/reduce-tap-result-size.py
+          python - <<'PY'
+          import ast, json, sqlite3, zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              source=z.read('market.py').decode()
+          module=ast.parse(source)
+          helpers=[node for node in module.body if isinstance(node,ast.FunctionDef) and node.name in ('_store_action_result','_load_action_result')]
+          assert len(helpers)==2
+          ns={}
+          exec(compile(ast.Module(body=helpers,type_ignores=[]),'market.py','exec'),ns)
+          encode,decode=ns['_store_action_result'],ns['_load_action_result']
+          for kind,obj in (
+              ('tap_batch', {'taps':[{'produced':'9'*7500,'critical':True}]*20,'stock':{'quantity':'7'*7500}}),
+              ('sunpress',{'spent':'1'*6000}),
+              ('upgrade',{'spent':'1'*5000}),
+              ('tap_batch',{'taps':[{'produced':1,'critical':False}]}),
+              ('buy_market',{'spent':999,'count':2}),
+          ):
+              packed=encode(kind,obj)
+              assert decode(packed)==obj
+              assert json.loads(packed) is not None
+              if kind!='tap_batch':assert packed==json.dumps(obj)
+              if kind=='tap_batch' and len(json.dumps(obj))>4096:
+                  assert len(packed)<len(json.dumps(obj))//5
+          db=sqlite3.connect(':memory:')
+          db.execute('CREATE TABLE actions (payload TEXT,result TEXT)')
+          for kind,object in [('tap_batch',{'taps':[{'produced':'8'*9000}]}),('upgrade',{'spent':100})]:
+              db.execute('INSERT INTO actions VALUES (?,?)',(json.dumps([kind]),encode(kind,object)))
+          rows=db.execute("SELECT json_extract(payload,'$[0]'),json_extract(result,'$.spent') FROM actions").fetchall()
+          assert rows==[('tap_batch',None),('upgrade',100)]
+          assert decode(json.dumps({'taps':[1,2],'stock':{'work':3}}))=={'taps':[1,2],'stock':{'work':3}}
+          assert '_store_action_result(kind,result)' in source
+          assert "_load_action_result(old['result'])" in source
+          compile(source,'market.py','exec')
+          print('TAP_CODEC_ROUNDTRIP_AND_LEGACY_SQL_OK')
+          PY
+          python deployment/reduce-tap-result-size.py
+          python - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              print('TAP_CODEC_REPEAT_PATCH_OK')
           PY
