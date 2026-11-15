@@ -5,6 +5,7 @@ on:
       - diagnostics/storage-growth-20261115
     paths:
       - .github/workflows/storage-growth-diagnostic.yml
+      - deployment/reduce-idle-market-ticks.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -52,4 +53,29 @@ jobs:
                       if re.search(r"password|secret|token|api.?key|credential",s,re.I): s="[redacted]"
                       print(f"CONTEXT {name}:{ln}: {s[:250]}")
           print("AUDIT_COMPLETE_NO_WRITES")
+          PY
+
+      - name: Apply idle-only optimization to disposable ZIP and validate output
+        run: |
+          python deployment/reduce-idle-market-ticks.py
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              src=z.read('market.py').decode()
+              assert 'No live listings: advance the cursor' in src
+              assert 'if rows or not self.accounts.postgres:' in src
+              assert 'FROM generate_series' not in src
+              assert "SELECT sold FROM market_ticks WHERE player=''" in src
+              assert "INSERT INTO market_ticks VALUES" in src
+              assert 'UPDATE market_cursor SET last=? WHERE id=1' in src
+              compile(src,'market.py','exec')
+          print("PATCH_SMOKE_OK")
+          PY
+          python deployment/reduce-idle-market-ticks.py
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              print("REPEAT_PATCH_OK")
           PY
