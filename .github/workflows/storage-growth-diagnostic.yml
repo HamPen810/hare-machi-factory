@@ -44,5 +44,12 @@ jobs:
                       s=lines[i]
                       if blocked.search(s): s="[redacted]"
                       print(f"{filename}:{i+1}: {s[:220]}")
+              for name,start,end in (("market.py",263,370),("market.py",474,525),("market.py",559,594)):
+                  src=z.read(name).decode("utf-8").splitlines()
+                  print("CONTEXT",name,start,end)
+                  for ln in range(start,end+1):
+                      s=src[ln-1]
+                      if re.search(r"password|secret|token|api.?key|credential",s,re.I): s="[redacted]"
+                      print(f"CONTEXT {name}:{ln}: {s[:250]}")
           print("AUDIT_COMPLETE_NO_WRITES")
           PY
