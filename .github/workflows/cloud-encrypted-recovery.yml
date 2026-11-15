@@ -1,0 +1,166 @@
+name: Encrypted cloud-only backup and disposable PostgreSQL recovery test
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/cloud-encrypted-recovery.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  restore-and-measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      PROD_URL: ${{ secrets.SUPABASE_DB_URL }}
+      RECOVERY_PASSPHRASE: ${{ secrets.RECOVERY_ENCRYPTION_PASSPHRASE }}
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d postgres"
+          --health-interval 4s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate secrets, free disk and exact project target
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PROD_URL:-}" || -z "${RECOVERY_PASSPHRASE:-}" ]]; then
+            echo "RECOVERY_BLOCKED_MISSING_SECRETS_NO_DATABASE_ACCESSED"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python - <<'PY'
+          import os,sys
+          from urllib.parse import urlsplit,parse_qs,unquote
+          u=os.getenv("PROD_URL","")
+          passphrase=os.getenv("RECOVERY_PASSPHRASE","")
+          if not u or not passphrase:
+              print("RECOVERY_BLOCKED_MISSING_SECRETS")
+              sys.exit(10)
+          if len(passphrase)<32:
+              print("RECOVERY_BLOCKED_WEAK_ENCRYPTION_SECRET")
+              sys.exit(10)
+          try:
+              p=urlsplit(u)
+              hostname=(p.hostname or "").lower()
+              username=unquote(p.username or "")
+              allowed=(hostname=="db.xnqvygduplopkkhnrbis.supabase.co" and username=="postgres") or (
+                 hostname.endswith(".pooler.supabase.com") and username=="postgres.xnqvygduplopkkhnrbis")
+              if p.scheme not in ("postgres","postgresql") or not allowed or p.path!="/postgres":
+                  raise ValueError("unexpected target")
+              if parse_qs(p.query).get("sslmode",["require"])[0] not in ("require","verify-ca","verify-full"):
+                  raise ValueError("TLS verification required")
+          except Exception:
+              print("RECOVERY_BLOCKED_UNRECOGNIZED_DB_URL")
+              sys.exit(10)
+          print("TARGET_VALIDATED_CREDENTIALS_NOT_PRINTED")
+          PY
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR==2{print $4}')
+          if (( free_kb < 9*1024*1024 )); then
+            echo "RECOVERY_BLOCKED_INSUFFICIENT_DISK"
+            exit 10
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Install local-only compaction driver
+        if: steps.gate.outputs.ready == 'true'
+        run: python -m pip install 'psycopg[binary]==3.2.13'
+      - name: Read-only dump from exact project and encrypt complete copy
+        if: steps.gate.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/hare-recovery"
+          WORK="$RUNNER_TEMP/hare-recovery"
+          # In container pg_dump is PostgreSQL 17; source connection is read-only.
+          docker run --rm --network host \
+            -e PROD_URL -v "$WORK:/work" postgres:17 \
+            bash -c 'exec pg_dump --dbname="$PROD_URL" --schema=hare_factory --format=custom --compress=6 --no-owner --no-privileges --file=/work/source.dump'
+          sha256sum "$WORK/source.dump" | awk '{print "SOURCE_BACKUP_SHA256",$1}'
+          docker run --rm --network host -v "$WORK:/work" postgres:17 \
+            pg_restore --list /work/source.dump > "$WORK/manifest.txt"
+          if ! grep -q "TABLE DATA hare_factory actions " "$WORK/manifest.txt"; then
+            echo "BACKUP_MANIFEST_MISSING_ACTIONS"; exit 12
+          fi
+          if ! grep -q "TABLE DATA hare_factory factories " "$WORK/manifest.txt"; then
+            echo "BACKUP_MANIFEST_MISSING_FACTORIES"; exit 12
+          fi
+          printf '%s' "$RECOVERY_PASSPHRASE" > "$WORK/.secret"
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-file "$WORK/.secret" --symmetric --cipher-algo AES256 \
+            --compress-algo none --output "$WORK/full-production.dump.gpg" "$WORK/source.dump"
+          # Verify encrypted file decrypts exactly before retaining artifact.
+          gpg --batch --yes --pinentry-mode loopback --passphrase-file "$WORK/.secret" \
+            --output "$WORK/full-check.dump" --decrypt "$WORK/full-production.dump.gpg" 2>/dev/null
+          cmp "$WORK/source.dump" "$WORK/full-check.dump"
+          rm -f "$WORK/full-check.dump"
+          echo "VERIFIED_ENCRYPTED_FULL_BACKUP_CREATED"
+      - name: Restore into disposable local PostgreSQL and run safe compaction
+        if: steps.gate.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/hare-recovery"
+          export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=tester PGPASSWORD=tester
+          DB=hare_recovery_audit_0123456789
+          docker run --rm --network host -e PGPASSWORD=tester postgres:17 createdb -h 127.0.0.1 -U tester "$DB"
+          docker run --rm --network host -e PGPASSWORD=tester -v "$WORK:/work" postgres:17 \
+            pg_restore -h 127.0.0.1 -U tester --no-owner --no-privileges --exit-on-error \
+            -d "$DB" /work/source.dump
+          python deployment/recovery/compact_restored_db.py \
+            --host 127.0.0.1 --db "$DB" --apply --archive-confirmed
+          docker run --rm --network host -e PGPASSWORD=tester postgres:17 \
+            psql -h 127.0.0.1 -U tester -X -v ON_ERROR_STOP=1 -d "$DB" -c 'VACUUM FULL hare_factory.actions'
+          docker run --rm --network host -e PGPASSWORD=tester postgres:17 \
+            psql -h 127.0.0.1 -U tester -X -v ON_ERROR_STOP=1 -d "$DB" -c 'VACUUM FULL hare_factory.market_ticks'
+          SIZE=$(docker run --rm --network host -e PGPASSWORD=tester postgres:17 \
+            psql -h 127.0.0.1 -U tester -X -At -d "$DB" -c "SELECT pg_database_size(current_database())")
+          echo "POST_COMPACTION_DATABASE_BYTES=$SIZE"
+          printf '%s\n' "$SIZE" > "$WORK/size.txt"
+          if (( SIZE >= 460*1024*1024 )); then
+            echo "FREE_PLAN_TARGET_NOT_YET_MET; no production writes"
+            exit 0
+          fi
+          docker run --rm --network host -e PGPASSWORD=tester -v "$WORK:/work" postgres:17 \
+            pg_dump -h 127.0.0.1 -U tester -Fc -Z 6 -n hare_factory -d "$DB" -f /work/compacted.dump
+          printf '%s' "$RECOVERY_PASSPHRASE" > "$WORK/.secret"
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-file "$WORK/.secret" --symmetric --cipher-algo AES256 \
+            --compress-algo none --output "$WORK/compacted.dump.gpg" "$WORK/compacted.dump"
+          echo "COMPACTED_ENCRYPTED_BACKUP_READY"
+      - name: Store encrypted full backup temporarily
+        if: always() && steps.gate.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hare-full-backup-encrypted
+          path: ${{ runner.temp }}/hare-recovery/full-production.dump.gpg
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Store encrypted compacted backup if ready
+        if: always() && steps.gate.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hare-compacted-backup-encrypted
+          path: ${{ runner.temp }}/hare-recovery/compacted.dump.gpg
+          if-no-files-found: ignore
+          retention-days: 3
+          compression-level: 0
+      - name: Remove plaintext and temporary encryption secret
+        if: always() && steps.gate.outputs.ready == 'true'
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/hare-recovery"
+          echo "NO_PRODUCTION_DB_WRITES_NO_RENDER_DEPLOY"

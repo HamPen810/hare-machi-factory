@@ -1,0 +1,32 @@
+name: Probe existing Oracle service connectivity (no deploy)
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/probe-free-db-destination.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read-only connectivity check
+        run: |
+          python - <<'PY'
+          import socket, ssl, urllib.request, urllib.error
+          endpoints=[("haremachi.duckdns.org",25565),("192.9.170.181",25565),("192.9.170.181",22),("192.9.170.181",443)]
+          for host,port in endpoints:
+              try:
+                  with socket.create_connection((host,port),timeout=7):
+                      print("TCP_REACHABLE",host,port)
+              except Exception as ex:
+                  print("TCP_UNREACHABLE",host,port,type(ex).__name__)
+          try:
+              request=urllib.request.Request("https://haremachi.duckdns.org:25565/health",headers={"User-Agent":"HareMachi-ReadOnly-Probe/1"})
+              with urllib.request.urlopen(request,timeout=9) as r:
+                  print("HEALTH_HTTP",r.status, r.read(300).decode("utf-8","replace"))
+          except Exception as ex:
+              print("HEALTH_UNAVAILABLE",type(ex).__name__,str(ex)[:180])
+          PY

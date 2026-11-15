@@ -1,0 +1,35 @@
+name: Test local-only recovery compaction against disposable PostgreSQL
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - deployment/recovery/compact_restored_db.py
+      - deployment/recovery/test_compact_restored_db.py
+      - .github/workflows/test-offline-recovery-compaction.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d postgres"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client driver
+        run: pip install 'psycopg[binary]==3.2.13'
+      - name: Test storage compaction on isolated synthetic PostgreSQL
+        run: python deployment/recovery/test_compact_restored_db.py

@@ -1,0 +1,28 @@
+name: Parse-check Windows local recovery orchestration
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - deployment/recovery/run_local_free_recovery.ps1
+      - .github/workflows/test-windows-local-free-recovery.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PowerShell syntax without executing local recovery
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $parseErrors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'deployment/recovery/run_local_free_recovery.ps1').Path,[ref]$tokens,[ref]$parseErrors)
+          if($parseErrors.Count -ne 0) { $parseErrors | Out-String | Write-Error; exit 1 }
+          if(-not $ast) { throw 'Could not parse recovery script' }
+          $source=Get-Content 'deployment/recovery/run_local_free_recovery.ps1' -Raw
+          if($source -notmatch 'hare_recovery_audit_' -or $source -notmatch 'ExpectedSha') { throw 'Missing recovery safety guards' }
+          if($source -match 'DROP DATABASE|DROP SCHEMA|TRUNCATE|supabase-db-url|curl.+supabase') { throw 'Destructive or remote operation detected' }
+          Write-Host 'WINDOWS_LOCAL_RECOVERY_PARSE_OK_NO_EXECUTION'

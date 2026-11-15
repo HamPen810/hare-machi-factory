@@ -1,0 +1,39 @@
+name: Validate cloud backup workflow without using credentials
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/cloud-encrypted-recovery.yml
+      - .github/workflows/test-cloud-backup-workflow.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check YAML and prevent plaintext artifact or production writes
+        run: |
+          python -m pip -q install PyYAML
+          python - <<'PY'
+          import pathlib,yaml
+          path=pathlib.Path('.github/workflows/cloud-encrypted-recovery.yml')
+          body=path.read_text()
+          doc=yaml.safe_load(body)
+          assert doc['permissions']=={'contents':'read'}
+          assert 'workflow_dispatch' in doc.get('on',doc.get(True,{}))
+          assert 'push' not in doc.get('on',doc.get(True,{}))
+          jobs=doc['jobs']
+          assert len(jobs)==1
+          steps=jobs['restore-and-measure']['steps']
+          assert all(not ('run' in s and 'DROP SCHEMA' in s['run']) for s in steps)
+          paths=[s.get('with',{}).get('path','') for s in steps if 'upload-artifact@' in s.get('uses','')]
+          assert len(paths)==2
+          assert all(p.endswith('.dump.gpg') for p in paths)
+          assert not any('SUPABASE_DB_URL' in s.get('run','') for s in steps)
+          assert 'docker run --rm --network host' in body
+          assert 'RECOVERY_ENCRYPTION_PASSPHRASE' in body
+          print("CLOUD_ENCRYPTED_RECOVERY_STATIC_GUARDS_OK")
+          PY
