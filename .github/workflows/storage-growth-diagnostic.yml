@@ -1,0 +1,48 @@
+name: Audit production archive storage writes (no deploy)
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/storage-growth-diagnostic.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  archive-inspection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect actual production ZIP without modifying it
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          import re
+          from hashlib import sha256
+          from pathlib import Path
+          path=Path("hare-machi-render.zip")
+          print("ARCHIVE_BYTES",path.stat().st_size)
+          print("ARCHIVE_SHA256",sha256(path.read_bytes()).hexdigest())
+          with ZipFile(path) as z:
+              invalid=z.testzip()
+              if invalid: raise RuntimeError("Invalid archived file "+invalid)
+              names=z.namelist()
+              print("ARCHIVE_FILES",len(names))
+              print("PYTHON_FILES",[n for n in names if n.endswith(".py")][:100])
+              patterns=re.compile(r"market_ticks|market_history|\bactions\b|\bdef\s+(act|settle|timeline|history)|idempot|INSERT\s+INTO|ON\s+CONFLICT",re.I)
+              blocked=re.compile(r"password|secret|token|api.?key|credential",re.I)
+              for filename in ("market.py","accounts.py","postgres.py","server.py","inventory_cluster.py"):
+                  if filename not in names:
+                      print("MISSING",filename);continue
+                  lines=z.read(filename).decode("utf-8").splitlines()
+                  hits=[i for i,s in enumerate(lines) if patterns.search(s)]
+                  print(f"FILE {filename}: {len(lines)} lines; {len(hits)} matching lines")
+                  chosen=set()
+                  for i in hits[:85]:
+                      chosen.update(range(max(0,i-2),min(len(lines),i+3)))
+                  for i in sorted(chosen):
+                      s=lines[i]
+                      if blocked.search(s): s="[redacted]"
+                      print(f"{filename}:{i+1}: {s[:220]}")
+          print("AUDIT_COMPLETE_NO_WRITES")
+          PY
