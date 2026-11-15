@@ -1,0 +1,59 @@
+name: Check cloud-only Supabase backup prerequisites (no data export)
+on:
+  push:
+    branches:
+      - diagnostics/storage-growth-20261115
+    paths:
+      - .github/workflows/check-cloud-backup-prerequisites.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report secret availability without exposing values
+        env:
+          A: ${{ secrets.SUPABASE_DB_URL }}
+          B: ${{ secrets.DATABASE_URL }}
+          C: ${{ secrets.POSTGRES_URL }}
+          D: ${{ secrets.SUPABASE_DATABASE_URL }}
+          E: ${{ secrets.HARE_FACTORY_DB_URL }}
+          F: ${{ secrets.DB_URL }}
+          G: ${{ secrets.RECOVERY_ENCRYPTION_PASSPHRASE }}
+        run: |
+          python - <<'PY'
+          import os
+          sources = {
+              "SUPABASE_DB_URL":"A",
+              "DATABASE_URL":"B",
+              "POSTGRES_URL":"C",
+              "SUPABASE_DATABASE_URL":"D",
+              "HARE_FACTORY_DB_URL":"E",
+              "DB_URL":"F",
+              "RECOVERY_ENCRYPTION_PASSPHRASE":"G",
+          }
+          for name, key in sources.items():
+              value=os.getenv(key,"")
+              if not value:
+                  print(name, "NOT_CONFIGURED")
+              elif name == "RECOVERY_ENCRYPTION_PASSPHRASE":
+                  print(name, "CONFIGURED" if len(value) >= 24 else "TOO_SHORT")
+              else:
+                  # Only classify database URL hostname; do not print URL, host, user, password.
+                  from urllib.parse import urlsplit
+                  from urllib.parse import unquote
+                  try:
+                      parsed=urlsplit(value)
+                      host=(parsed.hostname or "").lower()
+                      user=unquote(parsed.username or "")
+                      valid=(parsed.scheme in ("postgres","postgresql")
+                             and (host == "db.xnqvygduplopkkhnrbis.supabase.co" or
+                                  (host.endswith(".pooler.supabase.com") and
+                                   user=="postgres.xnqvygduplopkkhnrbis"))
+                             and (parsed.path or "") in ("/postgres","/"))
+                      print(name, "MATCHES_EXPECTED_PROJECT" if valid else "NOT_EXPECTED_PROJECT")
+                  except Exception:
+                      print(name, "INVALID_URL")
+          print("NO_DATABASE_CONNECTION_NO_EXPORT_NO_WRITES")
+          PY
