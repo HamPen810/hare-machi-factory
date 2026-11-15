@@ -24,7 +24,9 @@ jobs:
           doc=yaml.safe_load(body)
           assert doc['permissions']=={'contents':'read'}
           assert 'workflow_dispatch' in doc.get('on',doc.get(True,{}))
-          assert 'push' not in doc.get('on',doc.get(True,{}))
+          trigger=doc.get('on',doc.get(True,{}))
+          assert trigger['push']['branches']==['diagnostics/storage-growth-20261115']
+          assert trigger['push']['paths']==['.github/workflows/cloud-encrypted-recovery.yml']
           jobs=doc['jobs']
           assert len(jobs)==1
           steps=jobs['restore-and-measure']['steps']
