@@ -154,3 +154,18 @@ jobs:
               assert z.testzip() is None
               print('TAP_CODEC_REPEAT_PATCH_OK')
           PY
+
+      - name: Run established tax, bank and admin regression tests on modified archive
+        run: |
+          mkdir -p /tmp/hare-storage-integration
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in z.namelist():
+                  if name.endswith('.py') and '/' not in name:
+                      Path('/tmp/hare-storage-integration',name).write_bytes(z.read(name))
+          PY
+          PYTHONPATH=/tmp/hare-storage-integration python deployment/test-tax-accounting.py
+          PYTHONPATH=/tmp/hare-storage-integration python deployment/test-admin-online-chart.py
+          PYTHONPATH=/tmp/hare-storage-integration python deployment/test-multiple-bank-contracts.py
