@@ -48,7 +48,7 @@ def verify_backup(path, expected_sha):
         raise ValueError(f"SHA256 mismatch: {actual}; refusing restore")
     print(f"BACKUP_SHA256_OK bytes={size} sha256={actual}")
     manifest = run(["pg_restore", "--list", str(path)])
-    print(f"RESTORE_MANIFEST_OK entries={sum(1 for line in manifest.splitlines() if re.match(r'^\\d+;', line))}")
+    print(f"RESTORE_MANIFEST_OK entries={sum(1 for line in manifest.splitlines() if re.match(r'^\d+;', line))}")
     return manifest
 
 
