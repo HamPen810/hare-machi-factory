@@ -1,0 +1,58 @@
+name: Install Huge Number V2 library (safe inactive mode)
+on:
+  push:
+    paths:
+      - .github/workflows/install-huge-number-v2-inactive-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-install-huge-v2
+  cancel-in-progress: false
+jobs:
+  verify-and-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Run exact-number and huge-number tests
+        run: |
+          cd deployment
+          python -m unittest -v test_huge_number_v2 test_sparse_exact_v1 test_sparse_exact_division test_v2_numeric_lossless_backfill
+      - name: Install V2 arithmetic modules but keep accounting on NUMERIC
+        run: |
+          python deployment/install-huge-number-v2-inactive-20261119.py
+      - name: Validate all game Python and browser JavaScript
+        run: |
+          mkdir -p /tmp/hare-v2-check
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              names=z.namelist()
+              for name in names:
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode(), filename=name)
+                  if name.startswith('static/') and name.endswith('.js'):
+                      Path('/tmp/hare-v2-check',Path(name).name).write_bytes(z.read(name))
+              for name in ('huge_number_v2.py','sparse_exact_v1.py','sparse_exact_division.py','v2_numeric_lossless_backfill.py'):
+                  assert name in names
+              server=z.read('server.py').decode()
+              market=z.read('market.py').decode()
+              assert 'import huge_number_v2' not in server
+              assert 'import sparse_exact_v1' not in server
+              assert 'import huge_number_v2' not in market
+              assert 'import sparse_exact_v1' not in market
+              assert 'action_archive_support.py' in names
+              print('V2_LIBRARY_PRESENT_AND_LIVE_WRITES_DISABLED')
+          PY
+          for f in /tmp/hare-v2-check/*.js; do node --check "$f"; done
+      - name: Commit only production ZIP if tests succeeded
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Install dormant Huge Number V2 arithmetic modules"; git push; }
