@@ -1,4 +1,4 @@
-name: V2 purchase preview — test and deploy
+name: V2 purchase preview — exact numeric equivalence regression
 on:
   push:
     paths:
