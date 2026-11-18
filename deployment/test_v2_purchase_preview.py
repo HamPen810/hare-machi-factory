@@ -30,7 +30,7 @@ class PreviewTest(unittest.TestCase):
         self.assertEqual(out["illustrative_fee"],"S1:25@1499999998")
         self.assertEqual(S.deserialize(out["stock_after_preview"]).compare(S.parse("1e1000000000")+S.parse("3")),0)
         self.assertEqual(S.deserialize(out["cash_after_preview"]).compare(
-            S.parse("20")-S.parse("2e1500000000")-S.parse("2.5e149999999")),0)
+            S.parse("20")-S.parse("2e1500000000")-S.parse("2.5e1499999999")),0)
         self.assertEqual(self.db.execute("SELECT cash FROM factories WHERE player='a'").fetchone()[0],"20")
         self.assertEqual(self.db.execute("SELECT quantity FROM stock WHERE player='a'").fetchone()[0],"3")
         self.assertNotIn("987654",str(out))
