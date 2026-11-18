@@ -20,28 +20,38 @@ if new_fast not in code:
         raise RuntimeError("Market fast-forward anchor unexpected")
     code=code.replace(old_fast,new_fast,1)
 
-old_tail="""                self.db.execute('UPDATE market_cursor SET last=? WHERE id=1',(batch,))
-            self.db.commit()"""
-new_tail="""                self.db.execute('UPDATE market_cursor SET last=? WHERE id=1',(batch,))
-            # PostgreSQL auto-vacuum reuses deleted row space. Keep only 120 rounds.
-            if self.accounts.postgres and limit % 10 == 0:
-                self.db.execute('DELETE FROM market_ticks WHERE round < ?', (limit-120,))
-            self.db.commit()"""
-if new_tail not in code:
-    if code.count(old_tail)!=1:
-        raise RuntimeError("Settlement commit anchor unexpected")
-    code=code.replace(old_tail,new_tail,1)
+def insert_before_commit(code, marker, statements):
+    lines=code.splitlines(keepends=True)
+    locations=[i for i,line in enumerate(lines) if marker in line]
+    if len(locations)!=1:
+        raise RuntimeError(f"Expected one cursor update for {marker!r}; got {len(locations)}")
+    i=locations[0]
+    base=len(lines[i])-len(lines[i].lstrip())
+    j=None
+    for k in range(i+1,min(i+90,len(lines))):
+        ln=lines[k]
+        if 'self.db.commit()' in ln and len(ln)-len(ln.lstrip())<=base:
+            j=k
+            break
+    if j is None:
+        raise RuntimeError(f"Could not locate commit after {marker}")
+    indent=lines[j][:len(lines[j])-len(lines[j].lstrip())]
+    snippet=''.join(indent+part+'\n' for part in statements)
+    lines.insert(j,snippet)
+    return ''.join(lines)
 
-old_early="""                    self.db.execute('UPDATE market_cursor SET last=? WHERE id=1',(last,))
-                    self.db.commit()"""
-new_early="""                    self.db.execute('UPDATE market_cursor SET last=? WHERE id=1',(last,))
-                    if empty_end % 10 == 0:
-                        self.db.execute('DELETE FROM market_ticks WHERE round < ?', (empty_end-120,))
-                    self.db.commit()"""
-if new_early not in code:
-    if code.count(old_early)!=1:
-        raise RuntimeError("Fast-forward commit anchor unexpected")
-    code=code.replace(old_early,new_early,1)
+if "if self.accounts.postgres and limit % 10 == 0:" not in code:
+    code=insert_before_commit(code,
+        "UPDATE market_cursor SET last=? WHERE id=1',(batch,))",
+        ["# Reuse historical tick storage without losing current game state.",
+         "if self.accounts.postgres and limit % 10 == 0:",
+         "    self.db.execute('DELETE FROM market_ticks WHERE round < ?', (limit-120,))"])
+
+if "if empty_end % 10 == 0:" not in code:
+    code=insert_before_commit(code,
+        "UPDATE market_cursor SET last=? WHERE id=1',(last,))",
+        ["if empty_end % 10 == 0:",
+         "    self.db.execute('DELETE FROM market_ticks WHERE round < ?', (empty_end-120,))"])
 
 if code.count("DELETE FROM market_ticks WHERE round < ?")!=2:
     raise RuntimeError("Missing retention paths")
