@@ -23,6 +23,8 @@ ECONOMIC_COLUMNS={
     'market_ticks':('sold','revenue','inventory','cost'),
     'market_history':('offered','sold','revenue'),
     'factory_totals':('manufactured','purchases'),
+    # Added during 2026-11-19 storage recovery; preserve exact historical spending.
+    'action_spend_totals':('total_spent',),
     'auto_totals':('quantity',),
     'rare_collection':('quantity',),
     'admin_fund_transfers':('amount','before_cash','after_cash'),
