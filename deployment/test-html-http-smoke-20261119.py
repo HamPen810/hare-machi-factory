@@ -40,6 +40,10 @@ def run():
             for path in ("/api/factory","/api/data","/api/market","/api/ranks","/api/market-quotes","/api/bank","/api/notices"):
                 status,body=call("GET",path)
                 assert status==200,(path,status,body)
+            v2_status,v2=call("GET","/api/v2/balances")
+            assert v2_status==200 and v2["format"]=="S1" and v2["mode"]=="read-only", (v2_status,v2)
+            assert v2["cash"].startswith("S1:"),v2
+            assert call("POST","/api/v2/balances",{})[0] in (400,404,405)
             action={"kind":"tap","key":"integration-fixed-tap","product":"white","quantity":1}
             status,first=call("POST","/api/action",action)
             status2,again=call("POST","/api/action",action)
