@@ -1,0 +1,53 @@
+name: Repair native login form JSON mismatch
+on:
+  push:
+    paths:
+      - .github/workflows/fix-native-login-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-native-login-fix
+  cancel-in-progress: false
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Inspect original login and patch production ZIP
+        run: |
+          python deployment/fix-native-login-20261119.py
+      - name: Validate existing gameplay code and HTML login structure
+        run: |
+          mkdir -p /tmp/hare-login-check
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              server=z.read('server.py').decode()
+              assert "form_post = (self.path == '/api/login'" in server
+              assert 'self.send_response(303)' in server
+              assert "self.send_header('Location', '/')" in server
+              assert 'action_archive_support.py' in z.namelist()
+              assert 'static/index.html' in z.namelist()
+              for name in ('server.py','accounts.py','market.py','action_archive_support.py'):
+                  ast.parse(z.read(name).decode(),filename=name)
+              for name in ('app.js','numbers.js'):
+                  filename='static/'+name
+                  if filename in z.namelist():
+                      Path('/tmp/hare-login-check',name).write_bytes(z.read(filename))
+              html=z.read('static/index.html').decode()
+              print('LOGIN_FORM_HTML:',html[html.find('action="/api/login"')-300:html.find('action="/api/login"')+500])
+              print('ZIP_LOGIN_PATCH_TEST_OK')
+          PY
+          for f in /tmp/hare-login-check/*.js; do [ -f "$f" ] && node --check "$f"; done
+      - name: Commit only the verified production ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Fix login from native HTML form on mobile"; git push; }
