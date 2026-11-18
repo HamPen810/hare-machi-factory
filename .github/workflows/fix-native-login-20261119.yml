@@ -31,6 +31,7 @@ jobs:
               server=z.read('server.py').decode()
               assert "form_post = (self.path == '/api/login'" in server
               assert 'self.send_response(303)' in server
+              assert z.read('static/app.js').decode().count('let tapTelemetrySeq=0;') == 1
               assert "self.send_header('Location', '/')" in server
               assert 'action_archive_support.py' in z.namelist()
               assert 'static/index.html' in z.namelist()
@@ -45,6 +46,7 @@ jobs:
               print('ZIP_LOGIN_PATCH_TEST_OK')
           PY
           for f in /tmp/hare-login-check/*.js; do [ -f "$f" ] && node --check "$f"; done
+          echo 'ALL_BROWSER_SCRIPTS_SYNTAX_OK'
       - name: Commit only the verified production ZIP
         run: |
           git config user.name "github-actions[bot]"
