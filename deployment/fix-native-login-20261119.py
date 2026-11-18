@@ -53,13 +53,13 @@ files["server.py"] = server.encode("utf-8")
 js = files["static/app.js"].decode("utf-8")
 # Identical top-level lexical declarations make the entire UI fail parsing.
 decl = "let tapTelemetrySeq=0;"
-count = len(re.findall(r"(?m)^let tapTelemetrySeq=0;\\s*$", js))
+count = sum(line.strip() == decl for line in js.splitlines())
 if count == 2:
     pos = js.rfind(decl)
     js = js[:pos] + js[pos + len(decl):]
 elif count != 1:
     raise RuntimeError(f"Unexpected tapTelemetrySeq declaration count: {count}")
-if len(re.findall(r"(?m)^let tapTelemetrySeq=0;\\s*$", js)) != 1:
+if sum(line.strip() == decl for line in js.splitlines()) != 1:
     raise AssertionError("Duplicate declaration was not fixed")
 files["static/app.js"] = js.encode("utf-8")
 
