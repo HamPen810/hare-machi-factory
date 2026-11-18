@@ -44,6 +44,14 @@ def run():
             assert v2_status==200 and v2["format"]=="S1" and v2["mode"]=="read-only", (v2_status,v2)
             assert v2["cash"].startswith("S1:"),v2
             assert call("POST","/api/v2/balances",{})[0] in (400,404,405)
+            preview_status,preview=call("POST","/api/v2/preview",{
+                "product":"white","quantity":"1e1000000000",
+                "unit_price":"2e1000000000","fee_bps":1250})
+            assert preview_status==200, (preview_status,preview)
+            assert preview["mode"]=="simulation_only" and not preview["order_placed"]
+            assert preview["gross"]=="S1:2@2000000000"
+            assert call("POST","/api/v2/preview",{"product":"white","quantity":7,"unit_price":"1"})[0] in (400,422)
+            assert call("GET","/api/v2/balances")[1]["cash"]==v2["cash"]
             action={"kind":"tap","key":"integration-fixed-tap","product":"white","quantity":1}
             status,first=call("POST","/api/action",action)
             status2,again=call("POST","/api/action",action)
