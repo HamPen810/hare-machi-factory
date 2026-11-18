@@ -51,7 +51,7 @@ class RealSchemaStagingTradeTests(unittest.TestCase):
         trade=settle(self.db,"giant-settle-0001","buyer","seller","white",
                      "2e1000000000","3e2000000000",1250)
         self.assertEqual(trade["gross"].compare(S.parse("6e3000000000")),0)
-        self.assertEqual(trade["fee"].compare(S.parse("7.5e299999999")),0)
+        self.assertEqual(trade["fee"].compare(S.parse("7.5e2999999999")),0)
         self.assertEqual(sum_stock(self.db,"white").compare(stock_before),0)
         self.assertEqual((sum_cash(self.db)+trade["fee"]).compare(cash_before),0)
         cash=self.db.execute(
