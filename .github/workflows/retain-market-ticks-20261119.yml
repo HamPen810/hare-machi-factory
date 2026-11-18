@@ -1,4 +1,4 @@
-name: Bound market history and test production HTML/API
+name: Bound market history and test production HTML/API (retry)
 on:
   push:
     paths:
