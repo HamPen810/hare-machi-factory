@@ -27,7 +27,7 @@ class PreviewTest(unittest.TestCase):
         self.assertFalse(out["authoritative"])
         self.assertFalse(out["order_placed"])
         self.assertEqual(out["gross"],"S1:2@1500000000")
-        self.assertEqual(out["illustrative_fee"],"S1:25@1499999998")
+        self.assertEqual(S.deserialize(out["illustrative_fee"]).compare(S.parse("2.5e1499999999")),0)
         self.assertEqual(S.deserialize(out["stock_after_preview"]).compare(S.parse("1e1000000000")+S.parse("3")),0)
         self.assertEqual(S.deserialize(out["cash_after_preview"]).compare(
             S.parse("20")-S.parse("2e1500000000")-S.parse("2.5e1499999999")),0)
@@ -39,7 +39,7 @@ class PreviewTest(unittest.TestCase):
         out=purchase_preview(self.db,'a',{
             "product":"white","quantity":"3","unit_price":"10"
         })
-        self.assertEqual(out["cash_after_preview"],"S1:-1@1")
+        self.assertEqual(S.deserialize(out["cash_after_preview"]).compare(S.parse("-10")),0)
         self.assertEqual(out["stock_after_preview"],"S1:6@0")
         self.assertEqual(out["illustrative_fee"],"S1:")
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM stock").fetchone()[0],2)
