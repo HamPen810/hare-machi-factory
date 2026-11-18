@@ -51,12 +51,12 @@ class StagingBackfillTests(unittest.TestCase):
             cls.db.close()
 
     def test_01_legacy_exact_backup_reconciled(self):
-        for table,columns,expected in (
-            ("factories",("cash",),2),
-            ("stock",("quantity","work"),2),
-            ("action_spend_totals",("total_spent",),1),
+        for table,columns,changed,expected in (
+            ("factories",("cash",),2,2),
+            ("stock",("quantity","work"),1,2),
+            ("action_spend_totals",("total_spent",),1,1),
         ):
-            self.assertEqual(backfill_table(self.db,table,columns,batch_size=1),expected)
+            self.assertEqual(backfill_table(self.db,table,columns,batch_size=1),changed)
             self.assertEqual(verify_table(self.db,table,columns),expected)
             self.assertEqual(backfill_table(self.db,table,columns),0)
         row=self.db.execute("SELECT cash::text AS source,cash_v2 FROM hare_factory.factories WHERE player='p'").fetchone()
