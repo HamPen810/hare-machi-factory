@@ -1,0 +1,71 @@
+name: Bound market history and test production HTML/API
+on:
+  push:
+    paths:
+      - .github/workflows/retain-market-ticks-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-history-retention
+  cancel-in-progress: false
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Apply retention patch to real production ZIP
+        run: |
+          python deployment/keep-market-ticks-bounded-20261119.py
+      - name: Inspect and check all game code and browser scripts
+        run: |
+          mkdir -p /tmp/hare-smoke
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode('utf-8'), filename=name)
+                  if name.startswith('static/') and name.endswith('.js'):
+                      Path('/tmp/hare-smoke',Path(name).name).write_bytes(z.read(name))
+                  if name=='static/index.html':
+                      s=z.read(name).decode()
+                      assert 'id="auth-form"' in s and '/api/login' in s
+              market=z.read('market.py').decode()
+              assert market.count('DELETE FROM market_ticks WHERE round < ?') == 2
+              assert 'max(last+1, empty_end-120)' in market
+              app=z.read('static/app.js').decode()
+              assert app.count('let tapTelemetrySeq=0;') == 1
+              assert 'action_archive_support.py' in z.namelist()
+              print('ZIP_SYNTAX_AND_RETENTION_PASS')
+          PY
+          for f in /tmp/hare-smoke/*.js; do node --check "$f"; done
+      - name: Simulate registration login game and transactions on disposable SQLite
+        run: |
+          mkdir -p /tmp/hare-http
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      Path('/tmp/hare-http',name).write_bytes(z.read(name))
+              for name in z.namelist():
+                  if name.startswith('static/'):
+                      p=Path('/tmp/hare-http',name)
+                      p.parent.mkdir(parents=True,exist_ok=True)
+                      p.write_bytes(z.read(name))
+              Path('/tmp/hare-http/rules-default.txt').write_bytes(z.read('rules-default.txt'))
+          PY
+          PYTHONPATH=/tmp/hare-http python deployment/test-html-http-smoke-20261119.py
+      - name: Push only verified production ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Prune old market tick rounds and preserve gameplay"; git push; }
