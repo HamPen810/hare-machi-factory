@@ -1,8 +1,9 @@
-"""Patch production ZIP's server-side HTML login fallback without touching database."""
+"""Patch tested login route and browser script in production ZIP. No DB access."""
 from pathlib import Path
 from zipfile import ZipFile
 import ast
 import os
+import re
 import tempfile
 
 ARCHIVE = Path("hare-machi-render.zip")
@@ -23,7 +24,6 @@ OLD_LOGIN = """                    token=a.login(data.get('student_id'),data.get
                     return self.reply(200,{'ok':True},f'session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400')"""
 NEW_LOGIN = """                    token=a.login(data.get('student_id'),data.get('password'),now//1000)
                     if form_post:
-                        # Native HTML form submission: navigate to the game instead of showing JSON.
                         self.send_response(303)
                         self.send_header('Location', '/')
                         self.send_header('Set-Cookie', f'session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400; Secure')
@@ -33,29 +33,51 @@ NEW_LOGIN = """                    token=a.login(data.get('student_id'),data.get
                         self.end_headers()
                         return
                     return self.reply(200,{'ok':True},f'session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400')"""
+
 with ZipFile(ARCHIVE) as zin:
     if zin.testzip() is not None:
-        raise RuntimeError("Corrupt source ZIP")
+        raise RuntimeError("Corrupt production ZIP")
     entries = [(item, zin.read(item.filename)) for item in zin.infolist()]
-    original = zin.read("server.py").decode("utf-8")
+    files = {item.filename: raw for item, raw in entries}
+
+server = files["server.py"].decode("utf-8")
 for before, after in ((OLD_PARSE, NEW_PARSE), (OLD_LOGIN, NEW_LOGIN)):
-    if original.count(before) != 1:
-        raise RuntimeError(f"Expected one match, found {original.count(before)} for {before[:60]!r}")
-    original = original.replace(before, after, 1)
-ast.parse(original)
+    if after in server:
+        continue
+    if server.count(before) != 1:
+        raise RuntimeError(f"Unexpected server code for {before[:48]!r}")
+    server = server.replace(before, after, 1)
+ast.parse(server)
+files["server.py"] = server.encode("utf-8")
+
+js = files["static/app.js"].decode("utf-8")
+# Identical top-level lexical declarations make the entire UI fail parsing.
+decl = "let tapTelemetrySeq=0;"
+count = len(re.findall(r"(?m)^let tapTelemetrySeq=0;\\s*$", js))
+if count == 2:
+    pos = js.rfind(decl)
+    js = js[:pos] + js[pos + len(decl):]
+elif count != 1:
+    raise RuntimeError(f"Unexpected tapTelemetrySeq declaration count: {count}")
+if len(re.findall(r"(?m)^let tapTelemetrySeq=0;\\s*$", js)) != 1:
+    raise AssertionError("Duplicate declaration was not fixed")
+files["static/app.js"] = js.encode("utf-8")
+
 fd, temp = tempfile.mkstemp(dir=".", suffix=".zip")
 os.close(fd)
 try:
     with ZipFile(temp, "w") as zout:
-        for item, data in entries:
-            zout.writestr(item, original.encode("utf-8") if item.filename == "server.py" else data)
+        for item, _ in entries:
+            zout.writestr(item, files[item.filename])
     with ZipFile(temp) as check:
-        if check.testzip() is not None or check.read("server.py").decode("utf-8") != original:
+        if check.testzip() is not None:
             raise RuntimeError("Verification failed")
+        if check.read("server.py") != files["server.py"] or check.read("static/app.js") != files["static/app.js"]:
+            raise RuntimeError("Patched bytes mismatch")
         if "action_archive_support.py" not in check.namelist():
-            raise RuntimeError("Existing action-archive helper missing")
+            raise RuntimeError("Action archive helper missing")
     os.replace(temp, ARCHIVE)
 finally:
     if os.path.exists(temp):
         os.remove(temp)
-print("LOGIN_FORM_FALLBACK_PATCH_OK")
+print("LOGIN_AND_BROWSER_JS_PATCH_OK")
