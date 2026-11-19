@@ -1,0 +1,43 @@
+name: V2 server-priced unlock - isolated PostgreSQL 17
+on:
+  push:
+    branches:
+      - v2-full-economy-integration
+    paths:
+      - deployment/v2_real_schema_staging_actions.py
+      - deployment/test_v2_real_schema_staging_actions.py
+      - .github/workflows/v2-stage-unlock-postgres.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres-actions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: tester
+          POSTGRES_PASSWORD: tester
+          POSTGRES_DB: hare_v2_stage_unlock
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tester -d hare_v2_stage_unlock"
+          --health-interval 3s
+          --health-timeout 4s
+          --health-retries 20
+    env:
+      HARE_V2_LOCAL_STAGING: "yes"
+      V2_ACTION_STAGE_DSN: postgresql://tester:tester@127.0.0.1:5432/hare_v2_stage_unlock
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install disposable Postgres test client
+        run: pip install 'psycopg[binary]'
+      - name: Test exact action updates, real-shaped schema and unlock retry safety
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_real_schema_staging_actions
+      - name: Ensure live production ZIP was not changed
+        run: git diff --exit-code -- hare-machi-render.zip
