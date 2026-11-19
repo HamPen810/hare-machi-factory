@@ -65,7 +65,7 @@ class RealSchemaV2AllActions(unittest.TestCase):
                  product='white',quantity='1e800000000')
         self.assertEqual(compare(a['produced'],'1e800000000'),0)
         spent=action(self.db,'upgrade-v2-test-001','upgrade','p',cost='1e900000000')
-        self.assertEqual(compare(spent['spent'],'1e900000000'),0)
+        self.assertEqual(compare(spent['spent'],'600'),0)
         ship=action(self.db,'shipment-v2-test-001','ship','p',
                     product='white',quantity='5e799999999',price='1e900000000')
         self.assertEqual(compare(ship['reserved'],'5e799999999'),0)
@@ -78,6 +78,28 @@ class RealSchemaV2AllActions(unittest.TestCase):
         s=self.db.execute("SELECT quantity_v2 FROM hare_factory.stock "
                           "WHERE player='p'").fetchone()[0]
         self.assertEqual(S.deserialize(s).compare(S.parse('10e700000000')+S.parse('1e800000000')),0)
+
+    def test_upgrade_uses_locked_tier_and_ignores_client_quote(self):
+        before=self.cash('p')
+        a=action(self.db,'upgrade-cheap-quote-001','upgrade','p',cost='1')
+        self.assertEqual(compare(a['spent'],'600'),0)
+        self.assertEqual(a['tier'],2)
+        self.assertEqual(
+            S.deserialize(self.cash('p')).compare(
+                S.deserialize(before)-S.parse('600')),0)
+        replay=action(self.db,'upgrade-cheap-quote-001','upgrade','p',cost='1')
+        self.assertEqual(replay,a)
+        self.assertEqual(
+            self.db.execute("SELECT tier FROM hare_factory.factories "
+                            "WHERE player='p'").fetchone()[0],2)
+        b=action(self.db,'upgrade-expensive-quote-001','upgrade','p',
+                 cost='1e900000000')
+        self.assertEqual(compare(b['spent'],'3000'),0)
+        self.assertEqual(b['tier'],3)
+        self.assertEqual(
+            compare(self.db.execute(
+                "SELECT purchases_v2 FROM hare_factory.factory_totals "
+                "WHERE player='p'").fetchone()[0],'3600'),0)
 
     def test_server_priced_unlock_is_atomic_and_idempotent(self):
         # The browser cannot change the fixed sea/shisa unlock prices.
