@@ -78,7 +78,8 @@ def action(conn,op_id,kind,player,**payload):
         # as all subsequent writes, under locks, for ledger reconciliation.
         tracked_product=payload.get("product","white") if kind in (
             "manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price","unlock") else None
-        stock_before=None
+        # An unlock creates a new stock row; its pre-state is exact zero.
+        stock_before=Z if kind=="unlock" else None
         if tracked_product is not None:
             first_stock=conn.execute(
                 "SELECT quantity_v2 FROM hare_factory.stock "
@@ -114,8 +115,9 @@ def action(conn,op_id,kind,player,**payload):
             if existing:
                 raise ValueError("Product already unlocked")
             conn.execute(
-                "INSERT INTO hare_factory.stock(player,product,quantity_v2) VALUES(%s,%s,%s)",
-                (player,product,Z.serialize()))
+                "INSERT INTO hare_factory.stock(player,product,quantity_v2,work_v2) "
+                "VALUES(%s,%s,%s,%s)",
+                (player,product,Z.serialize(),Z.serialize()))
             conn.execute(
                 "UPDATE hare_factory.factories SET cash_v2=%s WHERE player=%s",
                 ((cash-cost).serialize(),player))
@@ -228,7 +230,7 @@ def action(conn,op_id,kind,player,**payload):
             if final_stock is not None:
                 stock_delta=v(final_stock[0])-stock_before
         produced=v(result["produced"]) if kind=="manufacture" else Z
-        expense=v(result["spent"]) if kind=="upgrade" else (
+        expense=v(result["spent"]) if kind in ("upgrade","unlock") else (
             positive(payload["amount"]) if kind=="admin_collect" else Z)
         emit_event(conn,op_id=op_id,player=player,role="actor",kind=kind,
                    product=tracked_product,cash=final_cash-original_cash,
