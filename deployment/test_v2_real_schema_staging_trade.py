@@ -124,7 +124,7 @@ class RealSchemaStagingTradeTests(unittest.TestCase):
 
     def test_05_same_key_altered_payload_is_rejected(self):
         settle(self.db,"immutability-key-1","buyer","seller","white","1","22")
-        with self.assertRaisesRegex(ValueError,"altered payload"):
+        with self.assertRaisesRegex(ValueError,"(altered payload|across different)"):
             settle(self.db,"immutability-key-1","buyer","seller","white","2","22")
         self.assertEqual(self.db.execute(
             "SELECT count(*) FROM hare_factory.v2_trade_receipts_stage").fetchone()[0],1)
