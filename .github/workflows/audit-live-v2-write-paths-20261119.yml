@@ -1,4 +1,4 @@
-name: Audit actual production financial mutation and V2 display coverage
+name: Audit actual production financial mutation and V2 display coverage (full scan)
 on:
   push:
     paths:
