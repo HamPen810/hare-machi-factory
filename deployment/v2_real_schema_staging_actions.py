@@ -73,6 +73,7 @@ def action(conn,op_id,kind,player,**payload):
         if registry_replay:
             raise ValueError("Registry contains operation without its receipt")
         cash,tier=_locked(conn,player)
+        original_cash=cash
         # Snapshot exact pre-operation values. This is in the same transaction
         # as all subsequent writes, under locks, for ledger reconciliation.
         tracked_product=payload.get("product","white") if kind in (
@@ -201,7 +202,7 @@ def action(conn,op_id,kind,player,**payload):
         expense=v(result["spent"]) if kind=="upgrade" else (
             positive(payload["amount"]) if kind=="admin_collect" else Z)
         emit_event(conn,op_id=op_id,player=player,role="actor",kind=kind,
-                   product=tracked_product,cash=final_cash-cash,
+                   product=tracked_product,cash=final_cash-original_cash,
                    stock=stock_delta,manufactured=produced,expense=expense)
         register_op(conn,op_id,"v2_action",fingerprint)
         conn.execute("INSERT INTO hare_factory.v2_action_receipts_stage VALUES(%s,%s,%s)",
