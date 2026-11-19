@@ -17,12 +17,13 @@ ECONOMIC_COLUMNS={
     'stock':('quantity','work'),
     'listings':('quantity','price'),
     'orders':('quantity','price'),
-    'bank_accounts':('deposit','matures','debt','tax','taxable_sales'),
-    'bank_contracts':('principal','amount','matures'),
+    'bank_accounts':('deposit','debt','tax','taxable_sales'),
+    'bank_contracts':('principal','amount'),
     'sales':('sold_quantity','unit_price','unit_cost'),
     'market_ticks':('sold','revenue','inventory','cost'),
     'market_history':('offered','sold','revenue'),
     'factory_totals':('manufactured','purchases'),
+    # Maturity/discovery timestamps remain legacy time fields, not money.
     # Added during 2026-11-19 storage recovery; preserve exact historical spending.
     'action_spend_totals':('total_spent',),
     'auto_totals':('quantity',),
