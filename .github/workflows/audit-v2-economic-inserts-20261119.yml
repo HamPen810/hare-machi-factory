@@ -1,0 +1,26 @@
+name: V2 shadow-column positional SQL compatibility gate
+on:
+  push:
+    paths:
+      - .github/workflows/audit-v2-economic-inserts-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scan-production-zip:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every economic PostgreSQL INSERT is explicit-column compatible
+        run: python deployment/test-v2-economic-insert-audit.py
+      - name: Check archive integrity and Python compilation
+        run: |
+          python - <<'PY'
+          import ast
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for n in z.namelist():
+                  if n.endswith('.py'):ast.parse(z.read(n).decode(),filename=n)
+          print('V2_SCHEMA_EXTENSION_PRECONDITIONS_PASS')
+          PY
