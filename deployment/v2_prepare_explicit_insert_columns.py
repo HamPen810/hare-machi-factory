@@ -36,12 +36,12 @@ for name in FILES:
     original_text=original[name].decode("utf-8")
     hits={}
     def add_columns(match):
-        table=match.group(4).lower()
+        table=match.group(3).lower()
         if table not in COLUMNS:return match.group(0)
         hits[table]=hits.get(table,0)+1
-        return match.group(1)+match.group(3)+table+"("+COLUMNS[table]+")"+match.group(5)+match.group(6)
-    # group2 is the optional OR clause, group3 whitespace, group4 table,
-    # group5 whitespace and group6 INSERT payload type.
+        return match.group(1)+match.group(2)+table+"("+COLUMNS[table]+")"+match.group(4)+match.group(5)
+    # group1 is INSERT INTO, group2 whitespace, group3 table,
+    # group4 whitespace, group5 VALUES/SELECT.
     replaced=SQL.sub(add_columns,original_text)
     if name=="market.py":
         for required in ("factory_totals","auto_totals","rare_collection","sales","listings","market_ticks","market_history"):
@@ -68,8 +68,8 @@ try:
         for name in FILES:
             src=z.read(name).decode("utf-8")
             for match in SQL.finditer(src):
-                if match.group(4).lower() in COLUMNS:
-                    raise RuntimeError("Still positional insert in "+name+": "+match.group(4))
+                if match.group(3).lower() in COLUMNS:
+                    raise RuntimeError("Still positional insert in "+name+": "+match.group(3))
     os.replace(temp,ARCHIVE)
 finally:
     if os.path.exists(temp):os.remove(temp)
