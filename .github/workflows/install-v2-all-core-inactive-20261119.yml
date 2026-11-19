@@ -1,0 +1,60 @@
+name: Install V2 all-operation core in safe inactive mode
+on:
+  push:
+    paths:
+      - .github/workflows/install-v2-all-core-inactive-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-v2-all-core-install
+  cancel-in-progress: false
+jobs:
+  test-and-install:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Run exact shipping, purchase, sale, upgrades, bank, admin and rankings test matrix
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_game_economy_full_reference test_v2_purchase_preview test_sparse_exact_v1 test_sparse_exact_division
+      - name: Install staged full-operation V2 core, retaining original game handlers
+        run: python deployment/install-v2-all-operation-core-inactive-20261119.py
+      - name: Compile all game and V2 modules and validate no live route was changed
+        run: |
+          mkdir -p /tmp/v2-original /tmp/v2-scripts
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode(),filename=name)
+                      Path('/tmp/v2-original',name).write_bytes(z.read(name))
+                  elif name.startswith('static/'):
+                      target=Path('/tmp/v2-original',name)
+                      target.parent.mkdir(parents=True,exist_ok=True)
+                      target.write_bytes(z.read(name))
+                      if name.endswith('.js'):
+                          Path('/tmp/v2-scripts',Path(name).name).write_bytes(z.read(name))
+                  elif name=='rules-default.txt':
+                      Path('/tmp/v2-original/rules-default.txt').write_bytes(z.read(name))
+              assert 'v2_game_economy_full_reference.py' in z.namelist()
+              for name in ('server.py','market.py','admin.py','bank.py'):
+                  source=z.read(name).decode()
+                  assert 'import v2_game_economy_full_reference' not in source
+              print('ALL_OPERATION_V2_STAGED_PACKAGE_AND_LIVE_GUARDS_OK')
+          PY
+          for js in /tmp/v2-scripts/*.js; do node --check "$js"; done
+      - name: Real HTTP login, conventional market, admin and V2 preview regressions on disposable SQLite
+        run: PYTHONPATH=/tmp/v2-original python deployment/test-html-http-smoke-20261119.py
+      - name: Commit production ZIP only after all regression checks pass
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Package inactive multi-operation exact V2 core"; git push; }
