@@ -1,0 +1,21 @@
+name: V2 cutover consistency gate regression
+on:
+  push:
+    branches:
+      - v2-full-economy-integration
+    paths:
+      - deployment/v2_cutover_consistency_gate.py
+      - deployment/test_v2_cutover_consistency_gate.py
+      - .github/workflows/v2-cutover-consistency.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-gate-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run isolated lossless consistency gate tests
+        run: PYTHONPATH=deployment python -m unittest -v deployment.test_v2_cutover_consistency_gate
+      - name: Compile audit and all staged V2 modules
+        run: python -m compileall -q deployment/v2_cutover_consistency_gate.py deployment/test_v2_cutover_consistency_gate.py
