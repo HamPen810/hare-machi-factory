@@ -14,6 +14,9 @@ class MigrationManifestTests(unittest.TestCase):
             self.assertIn(expected,pairs)
         self.assertNotIn(('factories','last_tap'),pairs)
         self.assertNotIn(('sales','settled_at'),pairs)
+        self.assertNotIn(('bank_accounts','matures'),pairs)
+        self.assertNotIn(('bank_contracts','matures'),pairs)
+        self.assertNotIn(('rare_collection','discovered'),pairs)
         self.assertNotIn(('players','created_at'),pairs)
 
     def test_ddl_preserves_existing_numeric_and_rolls_up(self):
