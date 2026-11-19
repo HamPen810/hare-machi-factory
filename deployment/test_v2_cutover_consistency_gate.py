@@ -44,6 +44,11 @@ class CutoverGateTests(unittest.TestCase):
         summary=inspect_shadow_consistency(c,{"stock":("quantity","work")})
         self.assertEqual((summary.rows,summary.columns,summary.values_checked),(2,1,4))
 
+    def test_both_null_is_valid_historical_empty_cell(self):
+        c=FakeConn({"stock":[(None,None,"0","S1:")]})
+        summary=inspect_shadow_consistency(c,{"stock":("quantity","work")})
+        self.assertEqual(summary.values_checked,2)
+
     def test_block_drift_and_nulls(self):
         for wrong,error in [("S1:2@1","drift"),(None,"missing"),("oops","invalid")]:
             c=FakeConn({"factories":[("10",wrong)]})
