@@ -33,6 +33,10 @@ def run():
         try:
             status,body=call("GET","/")
             assert status==200 and "<!doctype html>" in body
+            v2_status,v2_page=call("GET","/v2")
+            assert v2_status==200 and '超巨大数シミュレーター' in v2_page
+            client_status,client_js=call("GET","/v2.js")
+            assert client_status==200 and '/api/v2/preview' in client_js
             assert call("GET","/api/site")[0]==200
             assert call("GET","/api/factory")[0]==401
             status,body=call("POST","/api/register",{"name":"TEST","student_id":"2101","password":"123456"})
