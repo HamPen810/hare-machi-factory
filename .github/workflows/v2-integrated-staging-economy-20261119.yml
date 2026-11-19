@@ -1,4 +1,4 @@
-name: V2 end-to-end staging economy matrix — exact actions, trade and ledgers
+name: V2 end-to-end staging economy matrix — unified ID conflicts retry
 on:
   push:
     paths:
