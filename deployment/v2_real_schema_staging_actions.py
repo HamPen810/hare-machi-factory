@@ -8,6 +8,7 @@ import hashlib,json
 from sparse_exact_v1 import SparseExact as S
 from sparse_exact_division import mul_ratio_floor
 from v2_real_schema_staging_trade import _guard
+from v2_global_operation_registry import initialize as init_registry, check as check_registry, register as register_op
 
 Z=S.parse("0")
 
@@ -37,6 +38,7 @@ def _stock(conn,player,product):
 def initialize_stage(conn):
     _guard(conn)
     with conn.transaction():
+        init_registry(conn)
         conn.execute("""CREATE TABLE IF NOT EXISTS hare_factory.v2_action_receipts_stage(
           op_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result JSONB NOT NULL)""")
         conn.execute("""CREATE TABLE IF NOT EXISTS hare_factory.v2_bank_contracts_stage(
@@ -59,11 +61,15 @@ def action(conn,op_id,kind,player,**payload):
     with conn.transaction():
         conn.execute("SET LOCAL lock_timeout='6s'")
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",(op_id,))
+        registry_replay=check_registry(conn,op_id,"v2_action",fingerprint)
         old=conn.execute("SELECT fingerprint,result FROM hare_factory.v2_action_receipts_stage "
                          "WHERE op_id=%s",(op_id,)).fetchone()
         if old:
-            if old[0]!=fingerprint:raise ValueError("Operation ID payload mismatch")
+            if not registry_replay or old[0]!=fingerprint:
+                raise ValueError("Operation ID receipt and registry mismatch")
             return dict(old[1])
+        if registry_replay:
+            raise ValueError("Registry contains operation without its receipt")
         cash,tier=_locked(conn,player)
         result={}
         if kind in ("manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price"):
@@ -164,6 +170,7 @@ def action(conn,op_id,kind,player,**payload):
             conn.execute("DELETE FROM hare_factory.v2_bank_contracts_stage WHERE op_id=%s",
                          (payload["contract_id"],))
             result={"settled":due.serialize(),"cash":changed.serialize()}
+        register_op(conn,op_id,"v2_action",fingerprint)
         conn.execute("INSERT INTO hare_factory.v2_action_receipts_stage VALUES(%s,%s,%s)",
                      (op_id,fingerprint,json.dumps(result)))
         return result
