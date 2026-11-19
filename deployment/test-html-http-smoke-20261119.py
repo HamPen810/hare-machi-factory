@@ -38,6 +38,9 @@ def run():
             client_status,client_js=call("GET","/v2.js")
             assert client_status==200 and '/api/v2/preview' in client_js
             assert call("GET","/api/site")[0]==200
+            assert call("GET","/api/v2/ranks")[0]==401
+            assert call("GET","/api/v2/data")[0]==401
+            assert call("GET","/api/admin/v2/dashboard")[0] in (401,403)
             assert call("GET","/api/factory")[0]==401
             status,body=call("POST","/api/register",{"name":"TEST","student_id":"2101","password":"123456"})
             assert status==200, (status,body)
@@ -56,6 +59,12 @@ def run():
             assert preview["gross"]=="S1:2@2000000000"
             assert call("POST","/api/v2/preview",{"product":"white","quantity":7,"unit_price":"1"})[0] in (400,422)
             assert call("GET","/api/v2/balances")[1]["cash"]==v2["cash"]
+            v2rank_status,v2rank=call("GET","/api/v2/ranks")
+            assert v2rank_status==200 and v2rank["format"]=="S1", (v2rank_status,v2rank)
+            assert v2rank["rankings"]["manufactured"]["individual"][0]["manufactured"].startswith("S1:")
+            v2data_status,v2data=call("GET","/api/v2/data")
+            assert v2data_status==200 and v2data["format"]=="S1", (v2data_status,v2data)
+            assert isinstance(v2data["timeline"],list)
             action={"kind":"tap","key":"integration-fixed-tap","product":"white","quantity":1}
             status,first=call("POST","/api/action",action)
             status2,again=call("POST","/api/action",action)
