@@ -20,8 +20,13 @@ class RealSchemaV2AllActions(unittest.TestCase):
         cls.db.execute("CREATE SCHEMA IF NOT EXISTS hare_factory")
         cls.db.execute("CREATE TABLE hare_factory.factories("
                        "player TEXT PRIMARY KEY,cash_v2 TEXT NOT NULL,tier INT NOT NULL DEFAULT 1)")
+        # Mirror the real production columns and defaults: both legacy
+        # quantities remain NUMERIC while V2 shadows are additive TEXT.
         cls.db.execute("CREATE TABLE hare_factory.stock("
-                       "player TEXT,product TEXT,quantity_v2 TEXT NOT NULL,"
+                       "player TEXT,product TEXT,"
+                       "quantity NUMERIC NOT NULL DEFAULT 0,"
+                       "work NUMERIC NOT NULL DEFAULT 0,"
+                       "quantity_v2 TEXT,work_v2 TEXT,"
                        "PRIMARY KEY(player,product))")
         cls.db.execute("CREATE TABLE hare_factory.listings("
                        "id TEXT PRIMARY KEY,player TEXT,product TEXT,quantity_v2 TEXT,price_v2 TEXT,"
@@ -41,8 +46,10 @@ class RealSchemaV2AllActions(unittest.TestCase):
                 self.db.execute("TRUNCATE hare_factory."+tbl)
             self.db.execute("INSERT INTO hare_factory.factories VALUES "
                             "('p','S1:1@1000000000',1),('q','S1:',1)")
-            self.db.execute("INSERT INTO hare_factory.stock VALUES "
-                            "('p','white','S1:10@700000000'),('q','white','S1:')")
+            self.db.execute("INSERT INTO hare_factory.stock"
+                            "(player,product,quantity_v2,work_v2) VALUES "
+                            "('p','white','S1:10@700000000','S1:'),"
+                            "('q','white','S1:','S1:')")
             self.db.execute("INSERT INTO hare_factory.factory_totals VALUES "
                             "('p','S1:','S1:'),('q','S1:','S1:')")
 
@@ -81,9 +88,11 @@ class RealSchemaV2AllActions(unittest.TestCase):
         self.assertEqual(compare(unlocked['spent'],'300'),0)
         self.assertEqual(
             S.deserialize(self.cash('p')).compare(S.deserialize(before)-S.parse('300')),0)
-        self.assertEqual(
-            self.db.execute("SELECT quantity_v2 FROM hare_factory.stock "
-                            "WHERE player='p' AND product='sea'").fetchone()[0],'S1:')
+        quantity,work,legacy_qty,legacy_work=self.db.execute(
+            "SELECT quantity_v2,work_v2,quantity,work FROM hare_factory.stock "
+            "WHERE player='p' AND product='sea'").fetchone()
+        self.assertEqual((quantity,work),('S1:','S1:'))
+        self.assertEqual((legacy_qty,legacy_work),(0,0))
         self.assertEqual(action(self.db,'unlock-sea-v2-test-001','unlock','p',
                                 product='sea',cost='1'),unlocked)
         self.assertEqual(self.db.execute(
