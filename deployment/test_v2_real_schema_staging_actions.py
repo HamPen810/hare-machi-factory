@@ -93,6 +93,14 @@ class RealSchemaV2AllActions(unittest.TestCase):
             "WHERE player='p' AND product='sea'").fetchone()
         self.assertEqual((quantity,work),('S1:','S1:'))
         self.assertEqual((legacy_qty,legacy_work),(0,0))
+        event=self.db.execute(
+            "SELECT cash_delta_v2,stock_delta_v2,expense_v2 "
+            "FROM hare_factory.v2_economic_events_stage WHERE op_id=%s",
+            ('unlock-sea-v2-test-001',)).fetchone()
+        self.assertIsNotNone(event)
+        self.assertEqual(compare(event[0],'-300'),0)
+        self.assertEqual(compare(event[1],'0'),0)
+        self.assertEqual(compare(event[2],'300'),0)
         self.assertEqual(action(self.db,'unlock-sea-v2-test-001','unlock','p',
                                 product='sea',cost='1'),unlocked)
         self.assertEqual(self.db.execute(
