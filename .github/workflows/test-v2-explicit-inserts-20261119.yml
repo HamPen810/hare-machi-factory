@@ -1,4 +1,4 @@
-name: Prepare additive V2 schema-safe explicit economic inserts
+name: Prepare additive V2 schema-safe explicit economic inserts (regex fix)
 on:
   push:
     paths:
