@@ -1,0 +1,62 @@
+name: Prepare additive V2 schema-safe explicit economic inserts
+on:
+  push:
+    paths:
+      - .github/workflows/test-v2-explicit-inserts-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-v2-explicit-inserts
+  cancel-in-progress: false
+jobs:
+  verify-and-prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Rewrite production ZIP's schema-position-dependent money inserts only
+        run: python deployment/v2_prepare_explicit_insert_columns.py
+      - name: Compile all production Python and JavaScript
+        run: |
+          mkdir -p /tmp/v2-compat-app /tmp/v2-compat-js
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              if z.testzip():raise RuntimeError('Bad ZIP')
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode(),filename=name)
+                      Path('/tmp/v2-compat-app',name).write_bytes(z.read(name))
+                  elif name.startswith('static/'):
+                      out=Path('/tmp/v2-compat-app',name)
+                      out.parent.mkdir(parents=True,exist_ok=True)
+                      out.write_bytes(z.read(name))
+                      if name.endswith('.js'):
+                          Path('/tmp/v2-compat-js',Path(name).name).write_bytes(z.read(name))
+                  elif name=='rules-default.txt':
+                      Path('/tmp/v2-compat-app/rules-default.txt').write_bytes(z.read(name))
+              print('ALL_PRODUCTION_FILES_COMPILE_AFTER_INSERT_COMPAT')
+          PY
+          for file in /tmp/v2-compat-js/*.js; do node --check "$file"; done
+      - name: Exercise actual HTML and financial actions on disposable SQLite
+        env:
+          PYTHONPATH: /tmp/v2-compat-app
+          PRODUCTION_MODULE_DIR: /tmp/v2-compat-app
+        run: |
+          set -e
+          python deployment/test-html-http-smoke-20261119.py
+          for test in test-admin-funds.py test-admin-debt-bulk.py test-fast-debt-forgiveness.py test-debt-overdraft-clearing.py test-overdraft-admin-collections.py test-multiple-bank-contracts.py test-parallel-bank.py test-tax-accounting.py test-extra-student-slots.py test-paged-timeline.py test-admin-online-chart.py; do
+            python "deployment/$test"
+          done
+          echo "ECONOMIC_INSERT_REWRITE_PRESERVES_ALL_TESTED_GAMEPLAY"
+      - name: Commit only verified ZIP; existing DB schema remains unchanged
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Use explicit economic insert columns for safe future V2 shadow migration"; git push; }
