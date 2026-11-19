@@ -70,6 +70,12 @@ def inspect_shadow_consistency(conn, columns: Mapping[str, tuple[str, ...]],
                 local_rows += 1
                 for index, name in enumerate(names):
                     legacy, shadow=row[2*index:2*index+2]
+                    # Some historical nullable economic columns legitimately
+                    # have no source value. A matching NULL shadow is correct;
+                    # one-sided NULL is an incomplete/invalid migration.
+                    if legacy is None and shadow is None:
+                        value_count += 1
+                        continue
                     if legacy is None or shadow is None:
                         raise RuntimeError(
                             f"V2 shadow missing: {table}.{name} at scan row {local_rows}")
