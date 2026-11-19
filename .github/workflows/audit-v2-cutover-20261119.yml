@@ -1,0 +1,38 @@
+name: V2 production-cutover blocker audit
+on:
+  push:
+    paths:
+      - .github/workflows/audit-v2-cutover-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-real-game-shadow-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract real production game code without DB credentials
+        run: |
+          mkdir -p /tmp/hare-v2-existing
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      Path('/tmp/hare-v2-existing',name).write_bytes(z.read(name))
+                  elif name.startswith('static/'):
+                      p=Path('/tmp/hare-v2-existing',name)
+                      p.parent.mkdir(parents=True,exist_ok=True)
+                      p.write_bytes(z.read(name))
+                  elif name=='rules-default.txt':
+                      Path('/tmp/hare-v2-existing/rules-default.txt').write_bytes(z.read(name))
+          PY
+      - name: Require actual legacy game upgrade to reveal stale V2 shadow
+        run: |
+          PYTHONPATH=/tmp/hare-v2-existing python -m unittest -v deployment.test_v2_cutover_shadow_drift
+      - name: Explicitly prevent unsafe V2-live economy certification
+        run: |
+          echo "V2 live cutover is NOT permitted: legacy money and stock writers require atomic dual-write."
+          echo "Read-only V2 and simulations remain available."
