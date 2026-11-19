@@ -22,10 +22,10 @@ with ZipFile('hare-machi-render.zip') as z:
                    'tax','rank','data','chart','dash','profit','snapshot','inventory','stock','factory')):
                     snippet=ast.get_source_segment(src,node) or ''
                     queries=[]
-                    for match in re.finditer(r'(?is)(?:UPDATE|INSERT INTO|DELETE FROM|SELECT|REPLACE INTO)\\s+[a-z_]+',snippet):
+                    for match in re.finditer(r'(?is)(?:UPDATE|INSERT INTO|DELETE FROM|SELECT|REPLACE INTO)\s+[a-z_]+',snippet):
                         queries.append(re.sub(r'\\s+',' ',match.group(0)).upper())
                     print('FN',name,node.lineno,node.end_lineno,node.name,'SQL',','.join(dict.fromkeys(queries))[:350])
-            print('CONVERSION',name,{x:len(re.findall(r'\\b'+x+r'\\s*\\(',src)) for x in ('int','str','float','Decimal')})
+            print('CONVERSION',name,{x:src.count(x+'(') for x in ('int','str','float','Decimal')})
         else:
             for token in ('Number(', 'BigInt(', 'parseFloat(', 'parseInt(', '.toFixed(', 'JSON.stringify', 'chart', 'ranking'):
                 count=src.count(token)
