@@ -55,7 +55,7 @@ def action(conn,op_id,kind,player,**payload):
         raise ValueError("Invalid player")
     supported={"manufacture","upgrade","ship","edit_shipment","cancel_shipment",
       "set_price","admin_grant","admin_collect","admin_forgive",
-      "bank_borrow","bank_lend","bank_repay","bank_withdraw"}
+      "bank_borrow","bank_lend","bank_repay","bank_withdraw","unlock"}
     if kind not in supported:raise ValueError("Unsupported V2 action")
     fingerprint=hashlib.sha256(json.dumps(
         [kind,player,payload],sort_keys=True,ensure_ascii=False,
@@ -77,7 +77,7 @@ def action(conn,op_id,kind,player,**payload):
         # Snapshot exact pre-operation values. This is in the same transaction
         # as all subsequent writes, under locks, for ledger reconciliation.
         tracked_product=payload.get("product","white") if kind in (
-            "manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price") else None
+            "manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price","unlock") else None
         stock_before=None
         if tracked_product is not None:
             first_stock=conn.execute(
@@ -87,7 +87,7 @@ def action(conn,op_id,kind,player,**payload):
             if first_stock is not None and first_stock[0] is not None:
                 stock_before=v(first_stock[0])
         result={}
-        if kind in ("manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price"):
+        if kind in ("manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price","unlock"):
             product=payload.get("product","white")
             if product not in ("white","sea","shisa"):raise ValueError("Invalid product")
         if kind=="manufacture":
@@ -99,6 +99,35 @@ def action(conn,op_id,kind,player,**payload):
                          ((v(conn.execute("SELECT manufactured_v2 FROM hare_factory.factory_totals "
                             "WHERE player=%s FOR UPDATE",(player,)).fetchone()[0])+qty).serialize(),player))
             result={"produced":qty.serialize()}
+        elif kind=="unlock":
+            # Production parity: product unlock prices are server-owned, not
+            # supplied by the browser. The stage has no authorization layer;
+            # upstream must authenticate the player before calling action().
+            if product not in ("sea","shisa"):
+                raise ValueError("This product cannot be newly unlocked")
+            cost=S.parse(str({"sea":300,"shisa":1000}[product]))
+            if cash.compare(cost)<0:
+                raise ValueError("Insufficient money")
+            existing=conn.execute(
+                "SELECT 1 FROM hare_factory.stock WHERE player=%s AND product=%s FOR UPDATE",
+                (player,product)).fetchone()
+            if existing:
+                raise ValueError("Product already unlocked")
+            conn.execute(
+                "INSERT INTO hare_factory.stock(player,product,quantity_v2) VALUES(%s,%s,%s)",
+                (player,product,Z.serialize()))
+            conn.execute(
+                "UPDATE hare_factory.factories SET cash_v2=%s WHERE player=%s",
+                ((cash-cost).serialize(),player))
+            row=conn.execute(
+                "SELECT purchases_v2 FROM hare_factory.factory_totals "
+                "WHERE player=%s FOR UPDATE",(player,)).fetchone()
+            if row is None or row[0] is None:
+                raise ValueError("Missing V2 purchase total")
+            conn.execute(
+                "UPDATE hare_factory.factory_totals SET purchases_v2=%s WHERE player=%s",
+                ((v(row[0])+cost).serialize(),player))
+            result={"unlocked":product,"spent":cost.serialize()}
         elif kind=="upgrade":
             cost=positive(payload["cost"])
             if cash.compare(cost)<0:raise ValueError("Insufficient money")
