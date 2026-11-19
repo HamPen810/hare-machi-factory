@@ -1,0 +1,69 @@
+name: Install exact V2 number display and graphs
+on:
+  push:
+    paths:
+      - .github/workflows/install-v2-browser-display-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-v2-exact-display
+  cancel-in-progress: false
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact V2 comparison and massive exponent handling
+        run: |
+          node --check deployment/v2-browser-numbers.js
+          node deployment/test-v2-browser-numbers.cjs
+      - name: Patch production ZIP without changing economic code
+        run: python deployment/install-v2-browser-display-20261119.py
+      - name: Validate all original browser scripts and game Python
+        run: |
+          mkdir -p /tmp/v2-test /tmp/v2-game /tmp/v2-scripts
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import ast
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode(), filename=name)
+                      (Path('/tmp/v2-game')/name).write_bytes(z.read(name))
+                  elif name.startswith('static/'):
+                      p=Path('/tmp/v2-game')/name
+                      p.parent.mkdir(parents=True,exist_ok=True)
+                      p.write_bytes(z.read(name))
+                      if name.endswith('.js'):
+                          (Path('/tmp/v2-scripts')/Path(name).name).write_bytes(z.read(name))
+                  elif name=='rules-default.txt':
+                      Path('/tmp/v2-game/rules-default.txt').write_bytes(z.read(name))
+              for name in ('v2.html','v2.js','numbers.js'):
+                  (Path('/tmp/v2-test')/name).write_bytes(z.read('static/'+name))
+              assert b'window.TeruV2Number.compact' in z.read('static/numbers.js')
+              assert b'id="v2-stock-chart"' in z.read('static/v2.html')
+              print('EXACT_UI_INSTALL_AND_PYTHON_COMPILE_PASS')
+          PY
+          for f in /tmp/v2-scripts/*.js; do node --check "$f"; done
+      - name: Verify existing game login and economy APIs in disposable SQLite
+        run: PYTHONPATH=/tmp/v2-game python deployment/test-html-http-smoke-20261119.py
+      - name: Install Playwright 1.56 and Chromium in CI only
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install chromium
+      - name: Host isolated V2 HTML
+        run: |
+          nohup python3 -m http.server 8769 --bind 127.0.0.1 --directory /tmp/v2-test >/tmp/v2-ui-http.log 2>&1 &
+          sleep 2
+      - name: Simulate mobile and desktop V2 charts, authentication and huge input
+        run: node deployment/test-v2-mobile-browser.cjs
+      - name: Push verified production ZIP only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Enable exact V2 number rendering and stock magnitude graphs"; git push; }
