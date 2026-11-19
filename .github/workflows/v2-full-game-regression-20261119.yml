@@ -1,4 +1,4 @@
-name: Full gameplay and admin regression matrix for V2 cutover (collection accounting)
+name: Full gameplay and admin regression matrix for V2 cutover (bounded timeline)
 on:
   push:
     paths:
