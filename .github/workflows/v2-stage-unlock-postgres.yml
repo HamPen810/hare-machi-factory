@@ -8,6 +8,7 @@ on:
       - deployment/test_v2_real_schema_staging_actions.py
       - deployment/v2_stage_upgrade_pricing.py
       - deployment/test_v2_stage_upgrade_pricing.py
+      - deployment/test_v2_upgrade_production_parity.py
       - .github/workflows/v2-stage-unlock-postgres.yml
   workflow_dispatch:
 permissions:
@@ -41,5 +42,7 @@ jobs:
         run: |
           cd deployment
           python -m unittest -v test_v2_stage_upgrade_pricing test_v2_real_schema_staging_actions
+      - name: Cross-check stage upgrade prices against deployed ZIP
+        run: PYTHONPATH=deployment python -m unittest -v deployment.test_v2_upgrade_production_parity
       - name: Ensure live production ZIP was not changed
         run: git diff --exit-code -- hare-machi-render.zip
