@@ -72,6 +72,31 @@ class RealSchemaV2AllActions(unittest.TestCase):
                           "WHERE player='p'").fetchone()[0]
         self.assertEqual(S.deserialize(s).compare(S.parse('10e700000000')+S.parse('1e800000000')),0)
 
+    def test_server_priced_unlock_is_atomic_and_idempotent(self):
+        # The browser cannot change the fixed sea/shisa unlock prices.
+        before=self.cash('p')
+        unlocked=action(self.db,'unlock-sea-v2-test-001','unlock','p',
+                        product='sea',cost='1')
+        self.assertEqual(unlocked['unlocked'],'sea')
+        self.assertEqual(compare(unlocked['spent'],'300'),0)
+        self.assertEqual(
+            S.deserialize(self.cash('p')).compare(S.deserialize(before)-S.parse('300')),0)
+        self.assertEqual(
+            self.db.execute("SELECT quantity_v2 FROM hare_factory.stock "
+                            "WHERE player='p' AND product='sea'").fetchone()[0],'S1:')
+        self.assertEqual(action(self.db,'unlock-sea-v2-test-001','unlock','p',
+                                product='sea',cost='1'),unlocked)
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM hare_factory.v2_action_receipts_stage "
+            "WHERE op_id='unlock-sea-v2-test-001'").fetchone()[0],1)
+        with self.assertRaisesRegex(ValueError,'already unlocked'):
+            action(self.db,'unlock-sea-v2-test-002','unlock','p',product='sea')
+        with self.assertRaisesRegex(ValueError,'Insufficient money'):
+            action(self.db,'unlock-shisa-v2-001','unlock','q',product='shisa')
+        self.assertIsNone(self.db.execute(
+            "SELECT quantity_v2 FROM hare_factory.stock "
+            "WHERE player='q' AND product='shisa'").fetchone())
+
     def test_bank_loan_deposit_multiple_contract_repay(self):
         action(self.db,'borrow-v2-test-001','bank_borrow','q',amount='1e900000000',
                interest_bps=100)
