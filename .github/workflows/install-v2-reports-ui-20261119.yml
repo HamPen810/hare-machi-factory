@@ -1,0 +1,71 @@
+name: V2 mobile ranking and data graphs
+on:
+  push:
+    paths:
+      - .github/workflows/install-v2-reports-ui-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-v2-report-ui
+  cancel-in-progress: false
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Confirm V2 leaderboard and chart rendering source passes syntax
+        run: node --check deployment/v2_reports_ui_extension.js
+      - name: Install V2 report widgets to existing mobile V2 page
+        run: python deployment/install-v2-reports-ui-20261119.py
+      - name: Verify updated production ZIP has all tested components
+        run: |
+          mkdir -p /tmp/v2-app /tmp/v2-ui /tmp/v2-scripts
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode(), filename=name)
+                      Path('/tmp/v2-app',name).write_bytes(z.read(name))
+                  elif name.startswith('static/'):
+                      p=Path('/tmp/v2-app',name)
+                      p.parent.mkdir(parents=True,exist_ok=True)
+                      p.write_bytes(z.read(name))
+                      if name.endswith('.js'):
+                          Path('/tmp/v2-scripts',Path(name).name).write_bytes(z.read(name))
+                  elif name=='rules-default.txt':
+                      Path('/tmp/v2-app/rules-default.txt').write_bytes(z.read(name))
+              for name in ('v2.html','v2.js'):
+                  Path('/tmp/v2-ui',name).write_bytes(z.read('static/'+name))
+              assert b'id="v2-rank-form"' in z.read('static/v2.html')
+              assert b'id="v2-data-load"' in z.read('static/v2.html')
+              assert b'/api/v2/ranks' in z.read('static/v2.js')
+              assert b'/api/v2/data' in z.read('static/v2.js')
+              print('V2_RANK_AND_GRAPH_UI_PRESENT')
+          PY
+          for f in /tmp/v2-scripts/*.js; do node --check "$f"; done
+      - name: Regress all existing player game APIs and native V2 report endpoints
+        run: PYTHONPATH=/tmp/v2-app python deployment/test-html-http-smoke-20261119.py
+      - name: Install Chromium for mobile and desktop UI tests
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install chromium
+      - name: Host actual V2 HTML in isolated loopback browser
+        run: |
+          nohup python3 -m http.server 8769 --bind 127.0.0.1 --directory /tmp/v2-ui >/tmp/v2-ui.log 2>&1 &
+          sleep 2
+      - name: Simulate V2 rankings graph and exact money input at mobile and desktop sizes
+        run: node deployment/test-v2-mobile-browser.cjs
+      - name: Commit only tested production ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Add mobile V2 ranking and sales chart views"; git push; }
