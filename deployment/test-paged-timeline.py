@@ -39,11 +39,11 @@ while True:
     if not result['timeline_more']:break
     assert entries, "Page cursor did not advance"
     before=min(r['round'] for r in entries)
-    assert pages<10
+    assert pages<100
 assert seen==full, (len(seen),len(full))
 
 latest=g.timeline('token')
-assert min(r['round'] for r in latest['timeline'])==461
+assert min(r['round'] for r in latest['timeline'])==689
 assert max(r['round'] for r in latest['timeline'])==700
 assert latest['timeline_more']
 
@@ -55,4 +55,4 @@ assert g.timeline('token',after=701)['timeline']==[]
 # Per-player isolation: another user's sales must never appear.
 db.execute("INSERT INTO market_ticks VALUES(701,'white','stranger',1,100,0,0)")
 assert not any(r['player']=='stranger' for r in g.timeline('token')['timeline'])
-print("PASS: all historical rows reachable once, 240-minute pages, incremental refresh and player privacy")
+print("PASS: all historical rows reachable once, 12-round pages, incremental refresh and player privacy")
