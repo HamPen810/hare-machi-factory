@@ -60,13 +60,13 @@ class RealSchemaV2AllActions(unittest.TestCase):
         spent=action(self.db,'upgrade-v2-test-001','upgrade','p',cost='1e900000000')
         self.assertEqual(compare(spent['spent'],'1e900000000'),0)
         ship=action(self.db,'shipment-v2-test-001','ship','p',
-                    product='white',quantity='2e800000000',price='1e900000000')
-        self.assertEqual(compare(ship['reserved'],'2e800000000'),0)
+                    product='white',quantity='5e799999999',price='1e900000000')
+        self.assertEqual(compare(ship['reserved'],'5e799999999'),0)
         price=action(self.db,'reprice-v2-test-001','set_price','p',
                      product='white',price='3e900000000')
         self.assertEqual(compare(price['price'],'3e900000000'),0)
         ret=action(self.db,'cancel-v2-test-001','cancel_shipment','p',product='white')
-        self.assertEqual(compare(ret['returned'],'2e800000000'),0)
+        self.assertEqual(compare(ret['returned'],'5e799999999'),0)
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM hare_factory.listings").fetchone()[0],0)
         s=self.db.execute("SELECT quantity_v2 FROM hare_factory.stock "
                           "WHERE player='p'").fetchone()[0]
