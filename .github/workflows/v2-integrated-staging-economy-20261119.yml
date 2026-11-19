@@ -1,0 +1,85 @@
+name: V2 end-to-end staging economy matrix — exact actions, trade and ledgers
+on:
+  push:
+    paths:
+      - .github/workflows/v2-integrated-staging-economy-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  comprehensive-isolated-postgres-17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d postgres"
+          --health-interval 3s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      HARE_V2_LOCAL_STAGING: "yes"
+      PGPASSWORD: test
+      V2_ACTION_STAGE_DSN: postgresql://test:test@127.0.0.1:5432/hare_v2_stage_actions_final
+      V2_REAL_STAGE_DSN: postgresql://test:test@127.0.0.1:5432/hare_v2_stage_trade_final
+      V2_GLOBAL_STAGE_DSN: postgresql://test:test@127.0.0.1:5432/hare_v2_stage_ids_final
+      V2_EVENT_STAGE_DSN: postgresql://test:test@127.0.0.1:5432/hare_v2_stage_events_final
+      V2_TEST_STAGE_DSN: postgresql://test:test@127.0.0.1:5432/hare_v2_stage_backfill_final
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install local test driver and create five isolated databases
+        run: |
+          pip install 'psycopg[binary]'
+          for db in hare_v2_stage_actions_final hare_v2_stage_trade_final hare_v2_stage_ids_final hare_v2_stage_events_final hare_v2_stage_backfill_final; do
+            psql -h 127.0.0.1 -U test -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $db"
+          done
+      - name: Verify exact-number parsers before testing asset movement
+        run: |
+          cd deployment
+          python -m unittest -v test_sparse_exact_v1 test_sparse_exact_division test_v2_numeric_lossless_backfill test_v2_shadow_schema_manifest
+      - name: Validate production-shape atomic V2 shipment, price, upgrade, bank and admin
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_real_schema_staging_actions
+      - name: Verify giant market trades, concurrent buying, rollback and idempotency
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_real_schema_staging_trade
+      - name: Verify global immutable operation IDs across trade and all actions
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_global_operation_registry
+      - name: Verify exact ledger, bank refunds, returns, charts and financial rankings
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_stage_event_ledger
+      - name: Reconcile legacy to S1 backfill with restored-staging-only access
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_staging_backfill
+      - name: Test all staged V2 economy features, ranking and report converters
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_game_economy_full_reference test_v2_purchase_preview test_v2_read_reports test_v2_balance_read
+      - name: Reject accidental production money cutover
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              staged=('v2_global_operation_registry.py','v2_stage_event_ledger.py',
+                  'v2_real_schema_staging_actions.py','v2_real_schema_staging_trade.py')
+              for p in staged: assert p not in z.namelist(),p
+              for name in ('server.py','market.py','bank.py','admin.py'):
+                  text=z.read(name).decode('utf-8')
+                  assert 'import v2_real_schema_staging_actions' not in text
+                  assert 'import v2_real_schema_staging_trade' not in text
+              print('STAGING_TESTS_PASS; LIVE_V2_MONEY_CUTOVER_NOT_PERFORMED')
+          PY
