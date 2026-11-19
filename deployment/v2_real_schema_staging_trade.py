@@ -11,6 +11,7 @@ import json
 import os
 from sparse_exact_v1 import SparseExact as S
 from sparse_exact_division import mul_ratio_floor
+from v2_global_operation_registry import initialize as init_registry, check as check_registry, register as register_op
 
 RECEIPTS = "hare_factory.v2_trade_receipts_stage"
 ZERO = S.parse("0")
@@ -36,6 +37,7 @@ def _decode(value):
 def create_staging_receipts(conn):
     _guard(conn)
     with conn.transaction():
+        init_registry(conn)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS hare_factory.v2_trade_receipts_stage (
                 op_id TEXT PRIMARY KEY,
@@ -75,13 +77,16 @@ def settle(conn, op_id, buyer, seller, product, quantity_text, unit_price_text,
     with conn.transaction():
         conn.execute("SET LOCAL lock_timeout='6s'")
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",(op_id,))
+        registry_replay=check_registry(conn,op_id,"v2_trade",fingerprint)
         old=conn.execute(
             "SELECT fingerprint,gross_v2,fee_v2 FROM "+RECEIPTS+" WHERE op_id=%s",
             (op_id,)).fetchone()
         if old is not None:
-            if old[0]!=fingerprint:
-                raise ValueError("Operation ID reused with altered payload")
+            if not registry_replay or old[0]!=fingerprint:
+                raise ValueError("Trade receipt does not match global operation registry")
             return {"gross":_decode(old[1]),"fee":_decode(old[2]),"replay":True}
+        if registry_replay:
+            raise ValueError("Global registry contains trade without receipt")
 
         accounts=conn.execute(
             "SELECT player,cash_v2 FROM hare_factory.factories "
@@ -124,6 +129,7 @@ def settle(conn, op_id, buyer, seller, product, quantity_text, unit_price_text,
                 "WHERE player=%s AND product=%s",
                 (next_stock[player],player,product)).rowcount!=1:
                 raise RuntimeError("Missing stock row")
+        register_op(conn,op_id,"v2_trade",fingerprint)
         conn.execute(
             "INSERT INTO "+RECEIPTS+
             "(op_id,fingerprint,buyer,seller,product,quantity_v2,price_v2,gross_v2,fee_v2) "
