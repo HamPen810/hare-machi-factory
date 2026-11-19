@@ -1,4 +1,4 @@
-name: Full gameplay and admin regression matrix for V2 cutover (multi-contract rules)
+name: Full gameplay and admin regression matrix for V2 cutover (collection accounting)
 on:
   push:
     paths:
