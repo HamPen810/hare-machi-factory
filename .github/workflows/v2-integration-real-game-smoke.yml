@@ -1,0 +1,49 @@
+name: V2 integration branch - real game and exact economy smoke
+on:
+  push:
+    branches:
+      - v2-full-economy-integration
+    paths:
+      - deployment/v2_shadow_schema_manifest.py
+      - deployment/test_v2_shadow_schema_manifest.py
+      - deployment/v2_staging_backfill.py
+      - deployment/v2_game_economy_full_reference.py
+      - deployment/test_v2_game_economy_full_reference.py
+      - .github/workflows/v2-integration-real-game-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-game-with-staged-v2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract actual production archive to isolated test directory
+        run: |
+          mkdir -p /tmp/v2-current-game
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          root=Path('/tmp/v2-current-game')
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py') or name.startswith('static/') or name=='rules-default.txt':
+                      path=root/name
+                      path.parent.mkdir(parents=True,exist_ok=True)
+                      path.write_bytes(z.read(name))
+          PY
+      - name: Test real HTTP login, action, player data and administrator APIs
+        env:
+          PYTHONPATH: /tmp/v2-current-game
+        run: |
+          python deployment/test-html-http-smoke-20261119.py
+      - name: Test exact V2 economy, migrations, quote and reports with synthetic assets
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_shadow_schema_manifest test_v2_numeric_lossless_backfill test_v2_game_economy_full_reference test_v2_purchase_preview test_v2_read_reports test_v2_balance_read test_v2_cutover_consistency_gate test_v2_live_schema_preflight
+      - name: Confirm no mutation of real production game archives
+        run: |
+          git diff --exit-code -- hare-machi-render.zip
+          echo "V2 integration tests isolated; production deploy NOT triggered"
