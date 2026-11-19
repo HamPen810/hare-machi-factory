@@ -25,15 +25,13 @@ class FullV2EconomyTest(unittest.TestCase):
                          quantity="2e700000000",expected_price="4e1000000000")
         self.assertTrue(same(result["gross"],"8e1700000000"))
         self.assertEqual(e.data()["listing_count"],0)
-        self.assertTrue(same(e.balance("bob")["stock"]["white"],"100"+"0"*700000000) if False else
-                        S.deserialize(e.balance("bob")["stock"]["white"]).compare(S.parse("100")+S.parse("2e700000000"))==0)
+        self.assertEqual(S.deserialize(e.balance("bob")["stock"]["white"]).compare(S.parse("100")+S.parse("2e700000000")),0)
         self.assertEqual(e.balance("bob")["cash"][:3],"S1:")
         self.assertEqual(e.data()["action_count"],5)
         rank=e.rankings("revenue")
         self.assertEqual(rank[0]["player"],"alice")
         self.assertTrue(same(e.balance("bob")["spending"],"8e1700000000"))
-        self.assertTrue(same(e.data()["taxes"],"7.9999999999999999999999999999999999999999999999999999e1699999999") if False else
-                        S.deserialize(e.data()["taxes"]).sign()>0)
+        self.assertGreater(S.deserialize(e.data()["taxes"]).sign(),0)
 
     def test_ship_edit_cancel_and_price_validation(self):
         e=self.setup_game()
