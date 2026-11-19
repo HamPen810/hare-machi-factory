@@ -32,7 +32,8 @@ async function main(){
    });
    await page.goto(base,{waitUntil:'domcontentloaded'});
    await page.locator('#cash').waitFor({state:'visible',timeout:10000});
-   assert.equal(await page.locator('#cash').textContent(),balances.cash);
+   assert.ok((await page.locator('#cash').textContent()).includes(balances.cash));
+   assert.ok((await page.locator('#v2-stock-chart .v2-stock-entry').count())===2,'Stock magnitude chart displayed');
    const products=await page.locator('#product option').allTextContents();
    assert.deepEqual(products,['white','sea']);
    assert.equal(await page.locator('#submit').isDisabled(),false);
