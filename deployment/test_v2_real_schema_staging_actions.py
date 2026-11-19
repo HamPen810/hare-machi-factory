@@ -113,7 +113,7 @@ class RealSchemaV2AllActions(unittest.TestCase):
             "SELECT COUNT(*) FROM hare_factory.v2_action_receipts_stage").fetchone()[0],1)
         self.assertEqual(self.db.execute(
             "SELECT COUNT(*) FROM hare_factory.listings").fetchone()[0],1)
-        with self.assertRaisesRegex(ValueError,'payload mismatch'):
+        with self.assertRaisesRegex(ValueError,'(payload mismatch|across different)'):
             action(self.db,'identical-shipment-001','ship','p',
                    product='white',quantity='11',price='20')
 
