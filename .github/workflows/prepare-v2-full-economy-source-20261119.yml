@@ -1,0 +1,59 @@
+name: Prepare isolated V2 full-game source integration branch
+on:
+  push:
+    paths:
+      - .github/workflows/prepare-v2-full-economy-source-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-v2-source-branch
+  cancel-in-progress: false
+jobs:
+  stage-current-production-source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Extract exact production application Python and JS to temporary private workspace
+        run: |
+          mkdir -p /tmp/v2-production-source
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive='hare-machi-render.zip'
+          with ZipFile(archive) as z:
+              if z.testzip():raise RuntimeError('Production archive corrupted')
+              keep=('accounts.py','admin.py','bank.py','market.py','server.py',
+                    'postgres.py','exact.py','event.py','inventory_cluster.py',
+                    'static/app.js','static/admin.js','static/numbers.js',
+                    'static/index.html','static/admin.html')
+              for name in keep:
+                  if name not in z.namelist():
+                      print('ABSENT',name)
+                      continue
+                  data=z.read(name)
+                  if name.endswith('.py'):ast.parse(data.decode('utf8'),filename=name)
+                  dest=Path('/tmp/v2-production-source')/name
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  dest.write_bytes(data)
+                  print('EXTRACTED',name,len(data))
+          PY
+      - name: Commit source snapshot only to non-deploying V2 integration branch
+        run: |
+          git fetch origin v2-full-economy-integration
+          git checkout v2-full-economy-integration
+          mkdir -p v2-integration/current-production-source/static
+          cp /tmp/v2-production-source/*.py v2-integration/current-production-source/
+          cp /tmp/v2-production-source/static/* v2-integration/current-production-source/static/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v2-integration/current-production-source
+          git diff --cached --quiet || { git commit -m "Snapshot verified production source for isolated V2 refactor"; git push origin v2-full-economy-integration; }
+      - name: Assert main production ZIP not changed by this workflow
+        run: |
+          test "$(git branch --show-current)" = "v2-full-economy-integration"
+          echo "SOURCE_EXTRACTED_TO_NON_DEPLOYING_BRANCH_ONLY"
