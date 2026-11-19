@@ -37,23 +37,23 @@ assert len(rows)==2
 assert {x['kind'] for x in rows}=={'collect','grant'}
 assert all(x['student_id']=='2101' for x in rows)
 key3='cccccccc-cccc-4ccc-cccc-cccccccccccc'
-try:
- admin.fund_transfer('2101','collect',str(10**340),'too much',key3,1794480000002)
- raise AssertionError('overdraft succeeded')
-except ValueError:pass
-assert cash()==collect['after_cash']
-assert len(admin.fund_history())==2
+# Current game rule: administrator collections may overdraw cash below zero.
+overdraw=admin.fund_transfer('2101','collect',str(10**340),'overdraft allowed',key3,1794480000002)
+assert overdraw['after_cash']==collect['after_cash']-10**340
+assert cash()==overdraw['after_cash']
+assert len(admin.fund_history())==3
+key4='dddddddd-dddd-4ddd-dddd-dddddddddddd'
 for invalid in ['0','-1','1.3','abc']:
  try:
-  admin.fund_transfer('2101','grant',invalid,'bad',key3,1794480000002)
+  admin.fund_transfer('2101','grant',invalid,'bad',key4,1794480000003)
   raise AssertionError('invalid amount accepted')
  except ValueError:pass
-assert cash()==collect['after_cash']
+assert cash()==overdraw['after_cash']
 try:
- admin.fund_transfer('2102','grant','100','missing',key3,1794480000002)
+ admin.fund_transfer('2102','grant','100','missing',key4,1794480000003)
  raise AssertionError('missing account accepted')
 except ValueError:pass
 # Does not add sales, action spending, ranking entries or alter any other table.
 assert db.execute("SELECT count(*) FROM sqlite_master WHERE name='sales'").fetchone()[0]==0
 assert db.execute("SELECT count(*) FROM sqlite_master WHERE name='actions'").fetchone()[0]==0
-print('PASS: exact 1e310 transfers, safe overdraft, admin audit, replay idempotency, validation, no ranking mutations')
+print('PASS: exact 1e310 transfers, overdraft collection, admin audit, replay idempotency, validation, no ranking mutations')
