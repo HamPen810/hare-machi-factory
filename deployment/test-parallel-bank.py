@@ -33,12 +33,11 @@ deposit=bank.player_action(db,'tester','bank_lend',str(10**309),now,close)
 assert deposit['cash_change']==-(10**309)
 s=bank.player_state(db,'tester',now)
 assert s['deposit']>0 and s['debt']>0
+# Current rules allow multiple simultaneous contracts of both kinds.
 for kind in ('bank_borrow','bank_lend'):
-    try:
-        bank.player_action(db,'tester',kind,str(1),now,close)
-        raise AssertionError(f'duplicate active contract accepted: {kind}')
-    except ValueError:
-        pass
+    extra=bank.player_action(db,'tester',kind,str(1),now,close)
+    assert len(extra['contract_ids'])==1
+assert len(bank.player_state(db,'tester',now)['contracts'])==4
 bank.player_action(db,'tester','bank_withdraw',None,now+bank.HOUR_MS,close)
 assert bank.player_state(db,'tester',now)['debt']>0
 bank.player_action(db,'tester','bank_repay',None,now+bank.HOUR_MS,close)
@@ -47,4 +46,4 @@ db=make()
 bank.player_action(db,'tester','bank_lend','100',now,close)
 bank.player_action(db,'tester','bank_borrow','200',now,close)
 assert bank.player_state(db,'tester',now)['debt']>0
-print('PASS: borrow/deposit in both orders, independent maturity/repayment, huge integers and duplicate prevention')
+print('PASS: borrow/deposit in both orders, independent maturity/repayment, huge integers and independent simultaneous contracts')
