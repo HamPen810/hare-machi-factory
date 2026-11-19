@@ -17,16 +17,12 @@ with ZipFile(zipfile) as z:
     entries=[(info,z.read(info.filename)) for info in z.infolist()]
     files={info.filename:data for info,data in entries}
 server=files["server.py"].decode("utf-8")
-old="""            a=None
-            try:
-"""
+old="            if not write and self.path in ('/','/weather.js'"
 new="""            if not write and self.path in ('/v2', '/v2.js'):
                 asset='v2.html' if self.path=='/v2' else 'v2.js'
                 kind='text/html; charset=utf-8' if asset.endswith('.html') else 'text/javascript; charset=utf-8'
                 return self.static_reply(asset,kind,STATIC_CODE_CACHE)
-            a=None
-            try:
-"""
+"""+old
 if new not in server:
     if server.count(old)!=1:raise RuntimeError("Static GET route insertion anchor changed")
     server=server.replace(old,new,1)
