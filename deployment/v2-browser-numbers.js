@@ -62,9 +62,17 @@ function compact(wire,precision=5){
  const power=magnitude(terms);
  const prefix=polarity<0?'−':'';
  if(power<=14n){
-  let n=0n;
-  for(const [e,c] of absolute)n+=c*10n**e;
-  return prefix+n.toLocaleString('ja-JP');
+  let whole=0n;
+  for(let place=power;place>=0n;place--){
+   let lo=0n,hi=9n;
+   while(lo<hi){
+    const mid=(lo+hi+1n)/2n;
+    const candidate=whole*10n+mid;
+    if(sign(combine(absolute,[[place,candidate]],true))>=0)lo=mid;else hi=mid-1n;
+   }
+   whole=whole*10n+lo;
+  }
+  return prefix+whole.toLocaleString('ja-JP');
  }
  const count=Math.max(1,Math.min(8,Math.trunc(precision)));
  let coeff=0n;
@@ -74,8 +82,8 @@ function compact(wire,precision=5){
   let lo=0n,hi=9n;
   while(lo<hi){
    const mid=(lo+hi+1n)/2n;
-   const proposed=(coeff*10n+mid)*10n**place;
-   if(sign(combine(absolute,[[0n,proposed]],true))>=0)lo=mid;
+   const proposed=coeff*10n+mid;
+   if(sign(combine(absolute,[[place,proposed]],true))>=0)lo=mid;
    else hi=mid-1n;
   }
   coeff=coeff*10n+lo;
