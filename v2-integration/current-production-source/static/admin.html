@@ -1,0 +1,866 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>管理室 · 晴れ待ちファクトリー</title><style>
+*{box-sizing:border-box}body{margin:0;background:#edf3ec;color:#173f3d;font:14px/1.6 'Yu Gothic UI',Meiryo,sans-serif}main{max-width:1060px;margin:auto;padding:20px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}h1{font-size:24px;margin:0}h2{font-size:18px;margin:0 0 14px}small,.muted{color:#526e68}a{color:#167464}section{background:#fffaf0;border:1px solid #d2ddd1;border-radius:16px;padding:20px;margin-bottom:16px}button,input,select{font:inherit;border:1px solid #bdcec1;border-radius:8px;padding:10px;color:inherit;background:#fffdf5}button{cursor:pointer;min-height:44px}button.primary{background:#167464;color:white;border-color:#167464}label{display:grid;gap:5px}input{min-width:0;font-size:16px}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #c88b58;outline-offset:3px}[hidden]{display:none!important}#login{max-width:440px;margin:50px auto}#login form{display:grid;gap:14px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.stat{background:#fffaf0;border:1px solid #d2ddd1;border-radius:12px;padding:14px}.stat strong{display:block;font-size:24px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:15px}.tabs button[aria-selected=true]{background:#167464;color:white}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.table-wrap{overflow:auto;max-height:440px}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}th,td{padding:10px;border-bottom:1px solid #d2ddd1;text-align:left;white-space:nowrap}th{background:#edf3e7;position:sticky;top:0}td.name{white-space:normal;min-width:100px;overflow-wrap:anywhere}#notice{min-height:24px}#event{padding:10px 14px;background:#dcebe0;border-radius:10px}#account{display:flex;gap:8px;align-items:center}@media(max-width:600px){main{padding:12px}h1{font-size:19px}section{padding:14px}.stats{grid-template-columns:repeat(2,1fr);gap:8px}.stat strong{font-size:20px}.toolbar>*{max-width:100%}}
+.choice-tabs{display:flex;gap:5px;flex-wrap:wrap}.choice-tabs button{padding:8px 10px}.choice-tabs button[aria-selected=true]{background:#167464;color:white}@font-face{font-family:IslandHand;src:url('/fonts/Yomogi-Regular.ttf') format('truetype');font-display:swap}body,button,input,select,textarea{font-family:IslandHand,cursive}button:active{transform:translateY(1px)}button:disabled{opacity:.45}
+/* Administrative usability upgrade. Original form names and submission semantics preserved. */
+body{font-family:system-ui,-apple-system,"Yu Gothic",Meiryo,sans-serif;background:#f0f4f3;color:#1c3535}
+button,input,select,textarea{font-family:inherit}
+main{max-width:1440px;padding:18px 24px 32px}
+header{padding:5px 2px 12px}
+header h1{font-size:clamp(20px,2.4vw,28px);letter-spacing:.01em}
+#dashboard>section{background:#fff;border-color:#dbe6e3;box-shadow:0 2px 14px rgba(17,66,59,.045)}
+#dashboard>.tabs{position:sticky;top:0;z-index:25;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding:9px;background:rgba(246,250,249,.97);border:1px solid #dbe6e3;border-radius:14px;box-shadow:0 4px 22px rgba(24,62,59,.085);scrollbar-width:thin;overscroll-behavior-x:contain}
+.tabs button{flex:0 0 auto;border-color:transparent;background:transparent;font-weight:700;min-height:44px;transition:background .16s,color .16s}
+.tabs button[aria-selected="true"]{background:#116f68;color:#fff;box-shadow:0 2px 8px rgba(17,111,104,.2)}
+#event{font-weight:700}
+#dashboard>.toolbar{flex-wrap:wrap;padding:0 2px}
+#dashboard>.toolbar #account{margin-left:auto;flex-wrap:wrap}
+#updated{display:block;margin:4px 0 12px;font-variant-numeric:tabular-nums}
+#panel-operations>section{border:0;padding:0;background:transparent;margin:0}
+#panel-operations .toolbar{align-items:end}
+#panel-operations .an-fold{max-width:980px}
+#panel-overview .stats{grid-template-columns:repeat(3,minmax(0,1fr));margin:12px 0 22px}
+#panel-overview .stat{background:#f6faf8;border-color:#e2ebe8;min-width:0}
+#panel-overview .stat span{font-size:12px;color:#526e68}
+#panel-overview .stat strong{font-family:system-ui,sans-serif;font-size:clamp(16px,2.0vw,24px);line-height:1.4;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.an-title{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:10px}
+.an-title h2{font-size:clamp(19px,2.2vw,24px);margin:3px 0}
+.an-title p{margin:0;font-size:12px}
+.an-section-title{display:flex;align-items:baseline;gap:15px;flex-wrap:wrap;margin-top:10px}
+.an-section-title h3{font-size:17px;margin:0}
+.an-section-title p{margin:0}
+.an-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0}
+.an-subtabs{display:flex;gap:6px;flex-wrap:wrap}
+.an-subtabs button[aria-pressed="true"]{background:#116f68;color:#fff;border-color:#116f68}
+.an-market-range{display:flex;align-items:center;gap:8px;font-size:12px;color:#526e68}
+.an-market-range select{font-size:14px}
+.an-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.an-chart{border:1px solid #dfebe6;border-radius:14px;background:#fbfdfc;padding:16px;min-width:0}
+.an-chart h3{font-size:16px;margin:0 0 3px}
+.an-chart-caption{margin:0;color:#55716c;font-size:12px}
+.an-chart-foot{color:#5f736e;font-size:11px;margin:7px 0 0}
+.an-svg{display:block;width:100%;height:auto;min-height:185px;max-height:270px}
+.an-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 12px}
+.an-kpi{padding:12px;background:#eef7f3;border-radius:12px}
+.an-kpi span{display:block;font-size:11px;color:#57716b}
+.an-kpi strong{display:block;font-size:21px;line-height:1.4;font-variant-numeric:tabular-nums}
+.an-note{color:#657b75;font-size:12px;margin:16px 0 0}
+.an-fold{border:1px solid #dce9e5;border-radius:12px;padding:0 15px;margin:12px 0;background:#fafdfb}
+.an-fold>summary{cursor:pointer;list-style:none;font-weight:700;padding:14px 2px;position:relative}
+.an-fold>summary::after{content:"＋";position:absolute;right:6px;font-size:18px;color:#32776c}
+.an-fold[open]>summary::after{content:"−"}
+.an-fold>summary::-webkit-details-marker{display:none}
+.an-fold[open]{padding-bottom:16px}
+.an-fold form{margin-top:10px}
+.table-wrap{max-height:min(60vh,560px);border-radius:10px;border:1px solid #e0e9e6;overflow:auto}
+table{font-family:system-ui,"Yu Gothic",Meiryo,sans-serif}
+th{z-index:2;background:#eff5f1;font-size:12px}
+td{font-size:13px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #f0ac53;outline-offset:2px}
+@media(max-width:900px){.an-grid{grid-template-columns:1fr}.an-svg{max-height:300px}}
+@media(max-width:600px){
+ main{padding:10px}
+ header{align-items:start}
+ #dashboard>.tabs{border-radius:10px;padding:5px;margin:9px 0}
+ .tabs button{padding:9px 12px;font-size:13px}
+ section{padding:14px}
+ #panel-overview .stats,.an-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .an-chart{padding:12px}
+ .an-svg{min-height:160px}
+ #dashboard>.toolbar #account{margin-left:0}
+ .toolbar>*{max-width:none}
+ .an-market-range{width:100%;justify-content:flex-start}
+}
+/* Hare-Machi Command Deck v3: responsive fixed-viewport console.
+   No business-logic selectors are changed; panes remain native sections. */
+:root{--deck-ink:#eaf7f4;--deck-sea:#0b2533;--deck-accent:#23c9aa;--deck-line:#d8e5e2;--deck-card:#fff;--deck-shadow:0 10px 30px #072e3512;--deck-top:52px}
+body.console-active{background:#e9f2ef;color:#16353b;font:14px/1.4 system-ui,-apple-system,"Yu Gothic",Meiryo,sans-serif;overflow:hidden;height:100dvh}
+body.console-active main{width:100%;max-width:none;height:100dvh;min-height:0;padding:10px 12px;display:flex;flex-direction:column;overflow:hidden}
+body.console-active header{flex:0 0 auto;min-height:43px;margin:0 0 7px;align-items:center;padding:0 4px}
+body.console-active header h1{font-size:clamp(16px,2vw,21px);font-weight:850;letter-spacing:.025em}
+body.console-active header small{font-size:10px;letter-spacing:.15em;font-weight:800}
+body.console-active #dashboard{display:grid;grid-template-columns:192px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:9px 12px;flex:1;min-height:0;min-width:0;overflow:hidden}
+body.console-active #dashboard>.tabs{grid-column:1;grid-row:1/3;position:static;display:grid;grid-template-columns:1fr;grid-auto-rows:minmax(30px,1fr);gap:2px;align-content:stretch;overflow:hidden;margin:0;padding:11px;background:linear-gradient(157deg,#0c3340,#143c49 58%,#105b57);border:1px solid #30585e;border-radius:18px;box-shadow:0 14px 25px #0a485025}
+body.console-active #dashboard>.tabs:before{content:"COMMAND DECK";font-size:10px;font-weight:900;color:#88d9d0;letter-spacing:.19em;padding:3px 9px 6px}
+body.console-active #dashboard>.tabs button{background:transparent;color:#c3dcd9;border:0;border-radius:10px;text-align:left;min-height:0;padding:7px 11px;white-space:nowrap;font:700 12px/1.25 system-ui,"Yu Gothic",sans-serif}
+body.console-active #dashboard>.tabs button[aria-selected=true]{background:#dffff7;color:#105550;box-shadow:0 4px 10px #0002}
+body.console-active #dashboard>.tabs button:hover:not([aria-selected=true]){background:#ffffff18;color:white}
+body.console-active #dashboard>.toolbar{grid-column:2;grid-row:1;background:#fff;border:1px solid var(--deck-line);border-radius:13px;padding:7px 12px;margin:0;min-height:48px;box-shadow:var(--deck-shadow);gap:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap}
+body.console-active #dashboard>.toolbar #account{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+body.console-active #dashboard>.toolbar button{min-height:34px;padding:5px 12px;font-weight:750;font-size:12px}
+body.console-active #event{padding:7px 10px;font-size:11px;border-radius:9px;white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis}
+body.console-active #updated{display:none}
+body.console-active #dashboard>section[role=tabpanel]{grid-column:2;grid-row:2;min-width:0;min-height:0;margin:0;padding:clamp(10px,1.5vw,18px);background:linear-gradient(#fff,#fafffd);border:1px solid var(--deck-line);border-radius:17px;overflow:hidden;display:flex;flex-direction:column;gap:8px;box-shadow:var(--deck-shadow)}
+body.console-active #dashboard>section[role=tabpanel][hidden]{display:none!important}
+body.console-active #dashboard>section[role=tabpanel] h2{font-size:clamp(15px,2vw,19px);margin:0}
+body.console-active #dashboard>section[role=tabpanel] h3{font-size:14px;margin:0}
+body.console-active #dashboard>section[role=tabpanel] p{margin:2px 0}
+body.console-active .console-pane-title{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:25px;flex:0 0 auto}
+body.console-active .console-pane-title h2{margin:0;font-size:18px}
+body.console-active .console-pane-kicker{font-size:10px;font-weight:800;letter-spacing:.12em;color:#29927f}
+body.console-active .console-chip{padding:5px 9px;border-radius:50px;background:#e5f6f0;color:#146b61;font-size:11px;font-weight:800}
+body.console-active #notice{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:99;max-width:min(95vw,580px);pointer-events:none;background:#133b43;color:white;border-radius:12px;padding:9px 15px;font-weight:750;box-shadow:0 8px 24px #0003;margin:0;min-height:0}
+body.console-active #notice:empty{display:none}
+body.console-active footer{display:none}
+body.console-active .stats{margin:2px 0 0;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:0 0 auto}
+body.console-active .stat{min-width:0;padding:clamp(8px,1.5vw,14px);margin:0;background:linear-gradient(135deg,#e8fff4,#f8fff9);border:1px solid #cfebe2;border-radius:14px}
+body.console-active .stat:nth-child(2n){background:linear-gradient(135deg,#edf5ff,#fff)}
+body.console-active .stat:nth-child(3n){background:linear-gradient(135deg,#fff4e8,#fff)}
+body.console-active .stat span{font-size:11px;color:#557670;font-weight:700}
+body.console-active .stat strong{font:850 clamp(15px,1.8vw,23px)/1.2 system-ui,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.console-active .console-hero{position:relative;background:linear-gradient(108deg,#093e45,#136e69);color:white;padding:clamp(12px,2vw,25px);border-radius:15px;overflow:hidden;min-height:74px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex:0 0 auto}
+body.console-active .console-hero:after{content:"";position:absolute;width:180px;height:180px;border:26px solid #ffffff12;border-radius:50%;top:-94px;right:-25px;pointer-events:none}
+body.console-active .console-hero strong{font-size:clamp(16px,2.3vw,26px);display:block;position:relative;z-index:1}
+body.console-active .console-hero small{color:#b6fff0;font-size:11px}
+body.console-active .console-hero .hero-icon{font-size:clamp(22px,3vw,35px);position:relative;z-index:1}
+body.console-active .console-kpi-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;min-height:0;flex:1}
+body.console-active .console-kpi-tiles>article{display:flex;flex-direction:column;justify-content:center;align-items:start;gap:5px;min-height:0;background:#f2f9f7;border:1px solid #deede7;border-radius:14px;padding:12px}
+body.console-active .console-kpi-tiles>article .metric-label{font-size:12px;color:#547672;font-weight:700}
+body.console-active .console-kpi-tiles>article strong{font-size:clamp(16px,2.4vw,26px);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;max-width:100%;text-overflow:ellipsis}
+body.console-active .console-kpi-tiles>article .metric-help{font-size:11px;color:#6d8681}
+body.console-active .console-quick-nav{display:flex;gap:8px;flex:0 0 auto}
+body.console-active .console-quick-nav button{flex:1;background:#fff;border:1px solid #b9ded3;color:#167568;font-weight:800;min-height:39px}
+body.console-active .an-title{align-items:center;min-height:36px}
+body.console-active #panel-analysis .an-title h2{font-size:17px}
+body.console-active #panel-analysis #analytics-content{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+body.console-active #panel-analysis .an-grid{height:100%;min-height:0;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:10px}
+body.console-active #panel-analysis .an-chart{height:100%;min-height:0;display:flex;flex-direction:column;gap:4px;padding:9px;border:1px solid #dceae6;overflow:hidden;background:#f9fcfb}
+body.console-active #panel-analysis .an-chart h3{font-size:13px;margin:0}
+body.console-active #panel-analysis .an-chart-caption{font-size:10px;line-height:1.25}
+body.console-active #panel-analysis .an-chart-foot{font-size:10px;line-height:1.25;margin:0}
+body.console-active #panel-analysis .an-svg{height:100%;width:100%;flex:1;min-height:0;max-height:none;object-fit:contain}
+body.console-active #panel-analysis .an-kpis,body.console-active #panel-analysis .an-note{display:none}
+body.console-active #panel-analysis .an-toolbar{margin:0;gap:6px}
+body.console-active .an-subtabs{flex-wrap:nowrap;gap:3px;max-width:100%;overflow:hidden}
+body.console-active .an-subtabs button{min-height:32px;padding:5px 8px;font-size:11px;border-radius:9px;white-space:nowrap}
+body.console-active .an-market-range{font-size:11px;white-space:nowrap}
+body.console-active .an-market-range select{padding:5px;font-size:12px;min-height:31px}
+body.console-active .console-switcher{display:flex;align-items:center;gap:6px;min-height:34px;flex:0 0 auto}
+body.console-active .console-switcher button{min-height:32px;font-size:12px;padding:4px 9px;border-radius:9px;white-space:nowrap}
+body.console-active .console-switcher button[aria-pressed=true]{background:#14756b;color:#fff;border-color:#14756b}
+body.console-active .console-switcher .console-switcher-status{font-size:11px;color:#647a75;margin-left:auto;white-space:nowrap}
+body.console-active .console-page{display:none!important;min-width:0;min-height:0;overflow:hidden}
+body.console-active .console-page.console-visible{display:flex!important;flex:1;flex-direction:column;min-height:0;gap:8px}
+body.console-active .console-page>form{margin:0;min-height:0}
+body.console-active .console-page .toolbar{gap:7px;flex-wrap:wrap;margin:2px 0}
+body.console-active #panel-bank .an-fold{margin:0;border:0;padding:0;background:transparent;overflow:hidden;min-height:0}
+body.console-active #panel-bank .an-fold>summary{display:none}
+body.console-active #panel-bank .an-fold[open]{padding:0}
+body.console-active #panel-bank .an-fold>*{margin-top:3px}
+body.console-active input,body.console-active select,body.console-active textarea,body.console-active button{font-family:system-ui,"Yu Gothic",Meiryo,sans-serif}
+body.console-active input,body.console-active select,body.console-active textarea{padding:7px 9px;min-height:34px;font-size:13px}
+body.console-active button{padding:6px 10px;min-height:34px}
+body.console-active label{gap:3px;font-size:12px;font-weight:650}
+body.console-active .table-wrap{flex:1;min-height:0;max-height:none;overflow:hidden;border:1px solid #dbe7e4;border-radius:12px}
+body.console-active .table-wrap table{width:100%;table-layout:fixed}
+body.console-active .table-wrap th,body.console-active .table-wrap td{font-size:11px;padding:8px 7px;line-height:1.45;max-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+body.console-active .table-wrap tbody tr{cursor:pointer}
+body.console-active .table-wrap tbody tr:hover{background:#eff9f6}
+body.console-active .table-wrap tbody tr:focus-visible{outline:2px solid #17a48a;outline-offset:-2px}
+body.console-active .console-pager{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:34px;margin:1px 0;flex:0 0 auto}
+body.console-active .console-pager small{font-size:11px;color:#687f79}
+body.console-active .console-pager button{font-size:12px;padding:5px 10px;min-height:30px}
+body.console-active .console-inbox{display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.2fr);gap:12px;flex:1;min-height:0}
+body.console-active .console-inbox .console-inbox-list{display:flex;flex-direction:column;gap:5px;min-width:0;min-height:0}
+body.console-active .console-inbox .console-inbox-list button{width:100%;border:1px solid #d9e8e2;background:#fff;text-align:left;min-height:0;flex:1;display:flex;align-items:center;gap:9px;padding:9px 11px;overflow:hidden}
+body.console-active .console-inbox .console-inbox-list button[aria-current=true]{border-color:#0c9b7f;background:#ecfff8;box-shadow:inset 3px 0 #17a98c}
+body.console-active .console-inbox .console-inbox-list button .console-mail-icon{flex:0 0 auto;background:#dcf6ed;border-radius:8px;padding:7px}
+body.console-active .console-inbox .console-inbox-list button .console-mail-summary{display:flex;flex-direction:column;min-width:0;gap:3px}
+body.console-active .console-mail-summary strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.console-active .console-mail-summary small{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#69817b}
+body.console-active .console-inbox-detail{border:1px solid #dce9e5;background:#f8fcfa;border-radius:13px;min-width:0;min-height:0;padding:clamp(10px,1vw,15px);display:flex;flex-direction:column;gap:9px;overflow:hidden}
+body.console-active .console-inbox-detail .console-letter-body{flex:1;min-height:0;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:13px}
+body.console-active .console-inbox-detail .console-letter-title{font-size:15px;font-weight:800}
+body.console-active .console-inbox-detail .console-letter-meta{font-size:11px;color:#637f78}
+body.console-active #bulletin-admin-posts,body.console-active #bulletin-admin-messages{display:none!important}
+body.console-active .console-compose{display:flex;flex-direction:column;gap:7px;flex:1;min-height:0}
+body.console-active .console-compose form{display:flex;flex-direction:column;gap:7px;flex:1;min-height:0}
+body.console-active .console-compose textarea{flex:1;min-height:80px;resize:none}
+body.console-active .console-compose .toolbar{margin:0}
+body.console-active .console-compose .an-fold{border:0;margin:0;padding:0;background:transparent}
+body.console-active .console-compose .an-fold>summary{display:none}
+body.console-active .console-compose .an-fold[open]{padding:0}
+body.console-active #admin-mobile-nav{display:none;grid-column:2;grid-row:1}
+body.console-active .console-modal{position:fixed;inset:0;z-index:130;background:#09252dbb;display:flex;align-items:center;justify-content:center;padding:14px}
+body.console-active .console-modal[hidden]{display:none!important}
+body.console-active .console-modal-card{background:#fff;border-radius:17px;width:min(600px,100%);max-height:min(85dvh,630px);display:flex;flex-direction:column;padding:16px;gap:8px;overflow:hidden;box-shadow:0 25px 70px #001e2850}
+body.console-active .console-modal-card h3{margin:0;font-size:17px}
+body.console-active .console-modal-content{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(90px,30%) minmax(0,1fr);align-content:start;gap:8px;overflow-wrap:anywhere}
+body.console-active .console-modal-content .console-field-label{font-size:12px;color:#607d77}
+body.console-active .console-modal-content .console-field-value{font-size:12px;font-weight:700;word-break:break-word}
+body.console-active #panel-notices .console-pane-title,body.console-active #panel-messages .console-pane-title{flex:0 0 auto}
+body.console-active #panel-notices .console-inbox,body.console-active #panel-messages .console-inbox{min-height:0;flex:1}
+body.console-active #panel-notices .console-inbox-detail button{align-self:flex-start}
+body.console-active #panel-operations>.console-page{overflow:hidden}
+body.console-active .console-view-status{color:#69817b;font-size:11px}
+body.console-active #panel-operations #maintenance-state{font-size:14px;font-weight:800}
+body.console-active #panel-operations .toolbar{display:flex}
+body.console-active #panel-advanced .console-page{gap:10px}
+body.console-active #panel-advanced textarea{max-height:130px;resize:none}
+body.console-active #panel-advanced #extra-slot-list{max-height:none}
+body.console-active :is(.console-page,.console-inbox,.console-modal) [hidden]{display:none!important}
+@media(max-height:620px) and (min-width:741px){
+ body.console-active main{padding:5px 8px}
+ body.console-active header{min-height:32px;margin-bottom:4px}
+ body.console-active #dashboard>.tabs{grid-auto-rows:minmax(24px,1fr);padding:6px}
+ body.console-active #dashboard>.tabs:before{display:none}
+ body.console-active #dashboard>.tabs button{padding:3px 8px;font-size:11px}
+ body.console-active #dashboard>section[role=tabpanel]{padding:8px}
+}
+@media(max-width:1000px){
+ body.console-active #dashboard{grid-template-columns:154px minmax(0,1fr);gap:7px}
+ body.console-active #dashboard>.tabs button{font-size:11px;padding:6px}
+ body.console-active .an-market-range{display:none}
+}
+@media(max-width:740px){
+ body.console-active main{padding:7px 7px calc(6px + env(safe-area-inset-bottom))}
+ body.console-active header{min-height:33px;margin-bottom:4px;padding:0 4px}
+ body.console-active header h1{font-size:17px}
+ body.console-active header small{font-size:9px}
+ body.console-active #dashboard{grid-template-columns:1fr;grid-template-rows:38px 40px minmax(0,1fr);gap:6px}
+ body.console-active #dashboard>.tabs{display:none!important}
+ body.console-active #admin-mobile-nav{display:block;grid-column:1;grid-row:1;height:38px;min-height:38px;width:100%;background:#0b3e44;color:#fff;border:1px solid #26746f;border-radius:11px;font-weight:800;font-size:14px}
+ body.console-active #dashboard>.toolbar{grid-column:1;grid-row:2;min-height:0;padding:4px 7px}
+ body.console-active #dashboard>.toolbar button{font-size:11px;min-height:30px;padding:4px 9px}
+ body.console-active #event{font-size:10px;max-width:55%;padding:5px}
+ body.console-active #dashboard>section[role=tabpanel]{grid-column:1;grid-row:3;padding:10px;border-radius:13px;gap:5px}
+ body.console-active #panel-analysis .an-grid{grid-template-columns:minmax(0,1fr)}
+ body.console-active #panel-overview .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+ body.console-active .stat{padding:9px}
+ body.console-active .stat strong{font-size:clamp(15px,4vw,21px)}
+ body.console-active .console-hero{min-height:65px;padding:10px 14px}
+ body.console-active .console-kpi-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ body.console-active .console-kpi-tiles>article{padding:8px}
+ body.console-active .console-kpi-tiles>article strong{font-size:16px}
+ body.console-active .console-inbox{grid-template-columns:1fr}
+ body.console-active .console-inbox .console-inbox-list{display:flex}
+ body.console-active .console-inbox .console-inbox-detail{display:none}
+ body.console-active .console-inbox.console-reading .console-inbox-list{display:none}
+ body.console-active .console-inbox.console-reading .console-inbox-detail{display:flex}
+ body.console-active .console-pane-title h2{font-size:16px}
+ body.console-active .an-subtabs{flex-wrap:wrap;gap:3px}
+ body.console-active .an-subtabs button{min-height:28px;font-size:10px;padding:3px 6px}
+ body.console-active #panel-analysis .an-title{display:none}
+ body.console-active #panel-analysis .an-section-title{display:none}
+ body.console-active #panel-analysis .an-toolbar{min-height:40px}
+ body.console-active .console-switcher button{padding:4px 7px;font-size:11px}
+ body.console-active .console-modal-card{max-height:84dvh}
+}
+@media(max-height:660px) and (max-width:740px){
+ body.console-active .console-hero{min-height:48px;padding:6px 12px}
+ body.console-active .console-kpi-tiles>article .metric-help{display:none}
+ body.console-active .console-quick-nav button{min-height:29px}
+ body.console-active #panel-overview .stats .stat:nth-child(n+5){display:none}
+ body.console-active .console-pane-title{min-height:20px}
+}
+
+@media(min-width:741px){body.console-active .console-mobile-back{display:none}}
+@media(max-width:740px){body.console-active .console-mobile-back{align-self:flex-start;flex:0 0 auto}}
+body.console-active .console-inbox-detail .console-letter-body{margin:0}
+body.console-active #panel-notices #notice-inbox-area[hidden],
+body.console-active #panel-notices #notice-compose-area[hidden]{display:none!important}
+body.console-active #panel-notices #notice-inbox-area{display:grid;flex:1;min-height:0}
+body.console-active #panel-notices #notice-inbox{height:100%;min-height:0}
+body.console-active .an-chart[hidden]{display:none!important}
+body.console-active #panel-advanced>details,body.console-active #panel-advanced>form{flex:1;min-height:0}
+/* ADMIN_NATIVE_MOBILE_MENU_V4 */
+@media(min-width:741px){body.console-active #admin-mobile-nav{display:none!important}}
+@media(max-width:740px){
+body.console-active #admin-mobile-nav{display:block;position:relative;padding:0;background:none;border:0;box-shadow:none;overflow:visible;z-index:70}
+body.console-active #admin-mobile-toggle{height:38px;width:100%;border:1px solid #278274;border-radius:11px;background:#0b3e44;color:white;font-size:13px;font-weight:800;text-align:left;padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+body.console-active #admin-mobile-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;position:absolute;top:calc(100% + 5px);left:0;right:0;border-radius:12px;background:#0b3540;padding:8px;box-shadow:0 18px 40px #00242d55;max-height:calc(100dvh - 100px);overflow:hidden}
+body.console-active #admin-mobile-options[hidden]{display:none!important}
+body.console-active #admin-mobile-options button{font-size:11px;font-weight:750;color:#e5faf4;background:#16535a;border:1px solid #2b7072;border-radius:7px;min-height:32px;padding:6px;white-space:normal;line-height:1.1}
+body.console-active #admin-mobile-options button:hover,body.console-active #admin-mobile-options button:focus-visible{background:#d5fff3;color:#104b4b}
+}
+@font-face {
+ font-family:IslandRound;
+ src:local('HG丸ｺﾞｼｯｸM-PRO'),local('HGMaruGothicMPRO'),local('UD デジタル 教科書体 N-R');
+ font-display:swap;
+}
+/* HARE-MACHI / STUDIO CONSOLE — minimal visual layer.
+   Strictly styling. Reuses the same typography stack as the game.
+   Supports native 100dvh workspace and already implemented page controls. */
+:root {
+ --hm-bg:#f3f6f7;
+ --hm-paper:#ffffff;
+ --hm-soft:#f7f9fa;
+ --hm-ink:#20313b;
+ --hm-muted:#627681;
+ --hm-accent:#118d89;
+ --hm-accent-soft:#e2f4f1;
+ --hm-line:#e4e9ed;
+ --hm-dark:#122c36;
+ --hm-shadow:0 3px 15px rgba(20,44,58,.045);
+ --hm-round:IslandRound,'Hiragino Maru Gothic ProN','Yu Gothic UI',Meiryo,sans-serif;
+ --hm-hand:IslandHand,cursive;
+}
+@media (prefers-reduced-motion:no-preference) {
+ body.console-active button,body.console-active .an-chart,body.console-active .console-kpi-tiles>article,
+ body.console-active .console-mail-summary,body.console-active .table-wrap tbody tr {
+  transition:background-color .16s ease,color .16s ease,border-color .16s ease,
+  box-shadow .18s ease,transform .18s ease;
+ }
+ body.console-active #dashboard>section[role=tabpanel]:not([hidden]) {
+  animation:hm-show .22s cubic-bezier(.2,.75,.25,1) both;
+ }
+ @keyframes hm-show {from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+}
+body.console-active {
+ background:var(--hm-bg);
+ color:var(--hm-ink);
+ font-family:var(--hm-round);
+ letter-spacing:.005em;
+ -webkit-font-smoothing:antialiased;
+}
+body.console-active * {scrollbar-width:thin;scrollbar-color:#c5d4d6 transparent}
+body.console-active main {padding:10px 13px;gap:0}
+body.console-active header{margin:0 0 8px;padding:0 5px;min-height:47px}
+body.console-active header small{font-family:var(--hm-round);letter-spacing:.11em;color:#71929b;font-size:10px}
+body.console-active header h1{
+ font-family:var(--hm-hand);font-weight:700;
+ font-size:clamp(19px,2vw,25px);letter-spacing:.04em;color:#223940;
+}
+body.console-active header>a{
+ border-radius:10px;border:1px solid var(--hm-line);background:#fff;
+ color:#36585c;padding:8px 13px;text-decoration:none;font-size:12px;font-weight:700;
+}
+body.console-active #dashboard{grid-template-columns:183px minmax(0,1fr);gap:8px 12px}
+body.console-active #dashboard>.tabs {
+ background:var(--hm-dark);border:1px solid var(--hm-dark);
+ box-shadow:none;border-radius:17px;padding:15px 10px;
+ grid-auto-rows:minmax(30px,1fr);gap:1px;
+}
+body.console-active #dashboard>.tabs:before{
+ content:"MANAGEMENT";font-size:9px;letter-spacing:.21em;color:#83b1b7;
+ padding:3px 10px 8px;font-weight:800;
+}
+body.console-active #dashboard>.tabs button{
+ font:700 12px/1.2 var(--hm-round);
+ border:1px solid transparent;border-radius:8px;
+ color:#bed0d7;background:transparent;padding:7px 12px;
+}
+body.console-active #dashboard>.tabs button:hover:not([aria-selected=true]){
+ background:#ffffff0f;color:#fff;transform:translateX(2px)
+}
+body.console-active #dashboard>.tabs button[aria-selected=true]{
+ background:#f9fbfc;color:#193842;box-shadow:none;font-weight:800
+}
+body.console-active #dashboard>.toolbar{
+ background:var(--hm-paper);border:1px solid var(--hm-line);
+ border-radius:13px;box-shadow:var(--hm-shadow);
+ min-height:47px;padding:6px 11px;
+}
+body.console-active #dashboard>.toolbar #account{gap:8px}
+body.console-active #event{
+ background:var(--hm-accent-soft);color:#286d68;
+ border-radius:7px;padding:8px 10px;font-size:11px;font-weight:700
+}
+body.console-active #dashboard>section[role=tabpanel] {
+ background:#fff;border:1px solid var(--hm-line);
+ border-radius:14px;box-shadow:var(--hm-shadow);
+ padding:clamp(11px,1.7vw,19px);gap:9px;
+}
+body.console-active :is(#dashboard>section h2,#dashboard>section h3) {
+ color:#203744;font-family:var(--hm-round);font-weight:800;
+}
+body.console-active #dashboard>section h2{font-size:clamp(16px,1.85vw,21px)}
+body.console-active #dashboard>section h3{font-size:14px}
+body.console-active .console-pane-title h2,
+body.console-active #panel-analysis .an-title h2{font-family:var(--hm-hand);font-size:clamp(17px,2vw,23px)}
+body.console-active :is(button,input,select,textarea,label,summary,table,td,th){
+ font-family:var(--hm-round)!important
+}
+body.console-active :is(input,select,textarea){
+ background:#fff;color:#234049;border:1px solid #d7e2e7;
+ border-radius:9px;box-shadow:none;outline:none;font-size:13px;
+}
+body.console-active :is(input,select,textarea):focus{
+ border-color:var(--hm-accent);box-shadow:0 0 0 3px rgba(17,141,137,.10);
+}
+body.console-active :is(button,.console-quick-nav button){
+ border-radius:9px;box-shadow:none;font-weight:700;
+}
+body.console-active button.primary,
+body.console-active .console-switcher button[aria-pressed=true],
+body.console-active .an-subtabs button[aria-pressed=true]{
+ background:var(--hm-accent);border-color:var(--hm-accent);color:#fff;box-shadow:none;
+}
+body.console-active button:not(:disabled):active{transform:scale(.985)}
+body.console-active button:not(:disabled):hover{filter:brightness(.98)}
+body.console-active button:focus-visible,
+body.console-active a:focus-visible,
+body.console-active summary:focus-visible{
+ outline:2px solid var(--hm-accent);outline-offset:2px
+}
+body.console-active .console-chip{
+ background:var(--hm-accent-soft);border:1px solid #c8e8e2;
+ color:#237b74;font-size:10px;letter-spacing:.04em
+}
+body.console-active .console-hero{
+ background:#e9f5f2;color:#213e47;border:1px solid #d9eeea;
+ box-shadow:none;min-height:72px;
+}
+body.console-active .console-hero:after{border-color:#b4ddd41c}
+body.console-active .console-hero small{color:#648d8a;font-size:10px;font-weight:700}
+body.console-active .console-hero strong{
+ font-family:var(--hm-hand);font-weight:700;color:#213e47;font-size:clamp(20px,2.5vw,29px);
+}
+body.console-active .console-hero .hero-icon{font-size:28px;filter:saturate(.78)}
+body.console-active #panel-overview .stats{gap:8px;margin-top:3px}
+body.console-active #panel-overview .stat{
+ background:#fff!important;border:1px solid var(--hm-line);border-radius:12px;
+ box-shadow:none;padding:clamp(9px,1.3vw,14px);
+}
+body.console-active #panel-overview .stat span{
+ font-family:var(--hm-round);font-size:11px;color:var(--hm-muted)
+}
+body.console-active #panel-overview .stat strong{
+ font-family:var(--hm-round);font-size:clamp(16px,2vw,24px);color:#243b45;
+ font-variant-numeric:tabular-nums
+}
+body.console-active .console-kpi-tiles{gap:8px}
+body.console-active .console-kpi-tiles>article{
+ background:var(--hm-soft);border:1px solid var(--hm-line);border-radius:12px;
+ box-shadow:none;gap:5px;
+}
+body.console-active .console-kpi-tiles>article:hover{
+ border-color:#acd9cf;background:#f0f9f6;transform:translateY(-1px)
+}
+body.console-active .console-kpi-tiles>article .metric-label{color:#66808b;font-size:11px}
+body.console-active .console-kpi-tiles>article strong{
+ font-family:var(--hm-round);color:#243d45;font-weight:850;
+ font-variant-numeric:tabular-nums;font-size:clamp(17px,2.2vw,26px)
+}
+body.console-active .console-kpi-tiles>article .metric-help{color:#91a2a7;font-size:10px}
+body.console-active .console-quick-nav button{
+ background:#fff;border:1px solid #cbdde0;color:#286a6c;font-size:11px
+}
+body.console-active .console-quick-nav button:hover{background:var(--hm-accent-soft);border-color:#afd9d2}
+body.console-active .an-chart{
+ background:#fff!important;border:1px solid var(--hm-line)!important;
+ border-radius:11px!important;box-shadow:none
+}
+body.console-active .an-chart h3{font-weight:800;font-size:13px}
+body.console-active .an-chart-caption{color:#74858e;font-size:10px}
+body.console-active .an-subtabs button,
+body.console-active .console-switcher button{
+ background:#f7faf9;color:#597277;
+ border:1px solid transparent;font-weight:750;
+ border-radius:8px;box-shadow:none;
+}
+body.console-active .an-subtabs button[aria-pressed=true],
+body.console-active .console-switcher button[aria-pressed=true]{
+ color:#146862;background:#e5f5f0;border-color:#d1eae3;
+}
+body.console-active .console-switcher{
+ padding:4px;background:#f4f7f8;border:1px solid #edf0f1;
+ border-radius:10px;gap:3px;min-width:0;max-width:100%
+}
+body.console-active .console-switcher button{background:transparent}
+body.console-active .console-switcher-status{font-size:10px;color:#84959a}
+body.console-active .console-inbox-detail{
+ background:#f9fbfb;border:1px solid var(--hm-line);
+ border-radius:11px;box-shadow:none
+}
+body.console-active .console-inbox .console-inbox-list button{
+ border-radius:10px;border:1px solid var(--hm-line);background:#fff;
+}
+body.console-active .console-inbox .console-inbox-list button[aria-current=true]{
+ border-color:#8ec9be;background:#eff8f5;box-shadow:inset 2px 0 #1b9689
+}
+body.console-active .console-inbox .console-inbox-list button:hover{
+ background:#f6f9f9;border-color:#b8d9d3
+}
+body.console-active .console-inbox .console-inbox-list button .console-mail-icon{
+ background:#e7f3f0;color:#2e8278;filter:saturate(.7);
+}
+body.console-active .console-mail-summary strong{font-size:12px;color:#2f454d}
+body.console-active .console-mail-summary small{color:#91a1a4}
+body.console-active .console-letter-title{
+ font-family:var(--hm-hand);font-size:19px;letter-spacing:.03em
+}
+body.console-active .table-wrap{
+ border:1px solid var(--hm-line);border-radius:10px;background:#fff
+}
+body.console-active .table-wrap th{background:#f4f7f8;color:#60747c}
+body.console-active .table-wrap tbody tr:hover{background:#f4faf9}
+body.console-active .console-pager{gap:5px}
+body.console-active .console-pager button{
+ background:#f5f8f9;border:1px solid #e0e8ea;
+ color:#496e70;font-weight:700
+}
+body.console-active .an-fold{background:#fff;border:1px solid var(--hm-line);border-radius:11px}
+body.console-active .an-fold>summary{color:#365d63}
+body.console-active #notice{background:#203d44;color:#fff;box-shadow:0 10px 30px #122c3040}
+body.console-active .console-modal{background:#102a36ae}
+body.console-active .console-modal-card{
+ border-radius:14px;border:1px solid #dde8e9;box-shadow:0 18px 60px #10252a55
+}
+body.console-active #admin-mobile-options{
+ background:#193640;border:1px solid #294b53;border-radius:12px;box-shadow:0 12px 35px #142b3540
+}
+body.console-active #admin-mobile-options button{
+ background:transparent;color:#e0e9eb;border:1px solid transparent;
+ font-size:11px;border-radius:8px
+}
+body.console-active #admin-mobile-options button:hover,
+body.console-active #admin-mobile-options button:focus-visible{
+ background:#edf8f4;color:#24414a;border-color:#edf8f4
+}
+@media(max-height:660px) and (min-width:741px){
+ body.console-active #dashboard>.tabs{padding:6px}
+ body.console-active #dashboard>.tabs button{font-size:10.5px;padding:3px 8px}
+}
+@media(max-width:740px){
+ body.console-active main{padding:6px 7px calc(6px + env(safe-area-inset-bottom))}
+ body.console-active header{min-height:35px;margin-bottom:5px}
+ body.console-active header h1{font-size:18px}
+ body.console-active #dashboard{grid-template-columns:minmax(0,1fr);gap:5px}
+ body.console-active #admin-mobile-toggle{
+  background:var(--hm-dark);border-color:var(--hm-dark);
+  font-family:var(--hm-round);border-radius:9px;box-shadow:none;font-size:12px
+ }
+ body.console-active #dashboard>.toolbar{border-radius:10px;min-height:0}
+ body.console-active #dashboard>section[role=tabpanel]{
+  padding:10px;border-radius:11px;gap:6px
+ }
+ body.console-active .console-hero{padding:9px 12px;min-height:55px}
+ body.console-active .console-hero strong{font-size:19px}
+ body.console-active .console-kpi-tiles>article{padding:8px}
+ body.console-active .console-kpi-tiles>article strong{font-size:17px}
+ body.console-active .console-quick-nav{gap:5px}
+ body.console-active .console-quick-nav button{min-height:31px;padding:4px;font-size:10px}
+ body.console-active .console-switcher{gap:2px;padding:3px}
+ body.console-active .console-switcher button{padding:4px 7px;font-size:11px}
+ body.console-active #panel-analysis .an-chart{padding:9px!important}
+ body.console-active .console-inbox-detail .console-letter-title{font-size:18px}
+}
+
+/* Insight Lab: one large chart per page, typography matches Yomogi. */
+body.console-active #panel-analysis{position:relative;min-height:0;min-width:0;overflow:hidden}
+body.console-active #panel-analysis > .an-title,
+body.console-active #panel-analysis > .an-section-title,
+body.console-active #panel-analysis > .an-toolbar,
+body.console-active #panel-analysis > #analytics-content,
+body.console-active #panel-analysis > .an-note,
+body.console-active #panel-analysis > #console-chart-pager{display:none!important}
+body.console-active #panel-analysis #insight-lab{
+ display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;gap:8px;
+ font-family:IslandHand,'Yomogi',cursive;
+}
+body.console-active #insight-lab *{font-family:IslandHand,'Yomogi',cursive!important}
+body.console-active .lab-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex:0 0 auto}
+body.console-active .lab-head .lab-title{font-size:clamp(17px,2vw,23px);margin:0;color:#213b46;line-height:1.25;letter-spacing:.03em}
+body.console-active .lab-kicker{display:block;font-size:9px;letter-spacing:.17em;color:#278e86;font-weight:800}
+body.console-active .lab-all-count{font-size:12px;color:#6f858b;white-space:nowrap}
+body.console-active .lab-tabs{display:flex;gap:6px;flex:0 0 auto}
+body.console-active .lab-tab{padding:7px 14px;min-height:37px;color:#5d7780;background:#f5f8f8;border:1px solid #e5ecee;border-radius:9px;font-size:13px;cursor:pointer}
+body.console-active .lab-tab[aria-pressed="true"]{color:#106c66;background:#e3f3f0;border-color:#b7dfd7;font-weight:800}
+body.console-active .lab-card{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1;background:#fbfcfc;border:1px solid #e1e9eb;border-radius:12px;padding:10px 14px;overflow:hidden}
+body.console-active .lab-card-head{flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:4px}
+body.console-active .lab-card-head h3{margin:0;font-size:clamp(15px,1.7vw,20px);font-weight:800}
+body.console-active .lab-chart-kind{font-size:11px;white-space:nowrap;background:#e9f4f1;color:#187e73;padding:5px 9px;border-radius:12px}
+body.console-active .lab-svg{width:100%;height:100%;min-height:0;flex:1;overflow:visible;display:block}
+body.console-active .lab-svg text{font-family:IslandHand,'Yomogi',cursive!important}
+body.console-active .lab-note{flex:0 0 auto;font-size:clamp(11px,1.2vw,13px);color:#597178;margin:0!important;line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+body.console-active .lab-nav{display:flex;align-items:center;justify-content:center;gap:12px;flex:0 0 auto;min-height:34px}
+body.console-active .lab-nav-btn{background:#fff;border:1px solid #d1e4e2;border-radius:9px;color:#26736e;min-height:34px;min-width:90px;font-size:12px;font-weight:800}
+body.console-active .lab-counter{font-size:13px;color:#5b7780;font-variant-numeric:tabular-nums;min-width:56px;text-align:center}
+@media(max-width:740px){
+ body.console-active #panel-analysis #insight-lab{gap:5px}
+ body.console-active .lab-head .lab-title{font-size:17px}
+ body.console-active .lab-all-count{font-size:10px}
+ body.console-active .lab-tab{padding:6px 9px;font-size:11px;min-height:32px;flex:1}
+ body.console-active .lab-card{padding:6px 8px;border-radius:9px}
+ body.console-active .lab-card-head h3{font-size:14px}
+ body.console-active .lab-chart-kind{font-size:10px;padding:4px 6px}
+ body.console-active .lab-note{font-size:11px;line-height:1.25}
+ body.console-active .lab-nav{gap:8px;min-height:31px}
+ body.console-active .lab-nav-btn{min-height:30px;font-size:11px}
+}
+@media(max-height:650px){
+ body.console-active .lab-head{display:none}
+ body.console-active .lab-tabs{gap:3px}
+ body.console-active .lab-tab{padding:4px 7px;min-height:28px}
+ body.console-active .lab-nav{min-height:28px}
+ body.console-active .lab-nav-btn{min-height:28px}
+}
+/* Studio v4: calmer editorial palette and interactive time traveler */
+body.console-active {
+ --hm-bg:#f0f2f3;--hm-paper:#fff;--hm-ink:#243238;
+ --hm-muted:#70818a;--hm-accent:#176e78;--hm-accent-soft:#e6f1f0;
+ --hm-line:#e2e7e9;--hm-dark:#1a2b35;
+ --hm-shadow:0 7px 32px rgba(24,44,51,.055);
+}
+body.console-active #dashboard>.tabs{background:linear-gradient(165deg,#1a2b35,#243943);border-color:#2c4047}
+body.console-active #dashboard>.tabs button[aria-selected=true]{color:#1a4650;background:#f5f8f9}
+body.console-active #dashboard>section[role=tabpanel]{background:#fff;border-color:#e0e7e9}
+body.console-active .console-hero{background:#eff4f2;color:#273f43;border-color:#e3ebe8}
+body.console-active .lab-kicker{color:#a56f46}
+body.console-active .lab-heading,body.console-active .lab-title{letter-spacing:.025em}
+body.console-active .lab-tab[aria-pressed=true]{background:#e9f1f2;border-color:#bfd8db;color:#1e606c}
+body.console-active .lab-chart-kind{background:#f6ede3;color:#a06939}
+body.console-active .lab-svg text{font-size:16px}
+body.console-active .lab-card{border-radius:13px;background:#fff;border-color:#e1e9ec;box-shadow:0 8px 24px rgba(29,61,74,.05)}
+body.console-active .lab-timeline{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;background:#f5f8f8;border:1px solid #e0e9e9;border-radius:11px;padding:9px 13px}
+body.console-active .lab-timeline[hidden]{display:none!important}
+body.console-active .lab-timeline-head{display:flex;align-items:center;justify-content:space-between;gap:9px}
+body.console-active .lab-timeline-title{font-size:13px;color:#244451;font-weight:800}
+body.console-active .lab-time-label{color:#627d83;font-size:12px;font-variant-numeric:tabular-nums}
+body.console-active .lab-timeline-row{display:flex;align-items:center;gap:11px;min-height:32px}
+body.console-active .lab-play{flex:0 0 90px;min-height:32px;background:#203c47;color:#fff;border:0;border-radius:8px;font-size:12px;white-space:nowrap;cursor:pointer}
+body.console-active .lab-play[aria-pressed=true]{background:#a76d48}
+body.console-active .lab-slider{flex:1;min-width:0;height:8px;padding:0;margin:0;accent-color:#247b80;cursor:pointer;box-shadow:none;border:0}
+body.console-active .lab-time-edge{font-size:11px;color:#6c8388;white-space:nowrap}
+body.console-active .lab-nav-btn{color:#215b64;border-color:#ccdcdf;background:#f8fafb}
+body.console-active .lab-nav-btn:hover{background:#e6f1f1}
+@media(max-width:740px){
+ body.console-active .lab-timeline{padding:7px 8px;gap:3px}
+ body.console-active .lab-timeline-title{font-size:11px}
+ body.console-active .lab-time-label{font-size:10px}
+ body.console-active .lab-play{flex-basis:65px;font-size:10px;padding:4px}
+ body.console-active .lab-timeline-row{gap:5px}
+ body.console-active .lab-time-edge{font-size:9px;max-width:60px;white-space:normal;line-height:1.2}
+ body.console-active .lab-svg text{font-size:15px}
+}
+@media(max-height:650px){
+ body.console-active .lab-timeline{gap:2px;padding:5px 8px}
+ body.console-active .lab-timeline-row{min-height:26px}
+ body.console-active .lab-play{min-height:26px}
+}
+\n</style></head><body><main><header><div><small>晴れ待ちファクトリー</small><h1>工場長たちの管理室</h1></div><a href="/">ゲームへ</a></header>
+<section id="login"><h2>管理者ログイン</h2><p class="muted">お知らせ・参加者・ゲームの運用を管理します。</p><form id="login-form" method="post" action="/api/admin/login"><label>管理者パスワード<input id="password" type="password" required maxlength="128" autocomplete="current-password"></label><button class="primary" type="submit">管理室に入る</button></form></section>
+<div id="dashboard" hidden>
+<div class="toolbar"><div id="event"></div><div id="account"><button id="refresh">更新する</button><button id="logout">ログアウト</button></div></div><small id="updated"></small>
+<nav class="tabs" role="tablist" aria-label="管理画面"><button role="tab" id="tab-overview" data-panel="overview" aria-controls="panel-overview" aria-selected="true">概要</button><button role="tab" id="tab-analysis" data-panel="analysis" aria-controls="panel-analysis" aria-selected="false">データ分析</button><button role="tab" id="tab-notices" data-panel="notices" aria-controls="panel-notices" aria-selected="false">お知らせ</button><button role="tab" id="tab-messages" data-panel="messages" aria-controls="panel-messages" aria-selected="false">メッセージ</button><button role="tab" id="tab-players" data-panel="players" aria-controls="panel-players" aria-selected="false">参加者</button><button role="tab" id="tab-online" data-panel="online" aria-controls="panel-online" aria-selected="false">オンライン人数</button><button role="tab" id="tab-hybrid" data-panel="hybrid" aria-controls="panel-hybrid" aria-selected="false">サーバー負荷</button><button role="tab" id="tab-rankings" data-panel="rankings" aria-controls="panel-rankings" aria-selected="false">ランキング</button><button role="tab" id="tab-market" data-panel="market" aria-controls="panel-market" aria-selected="false">市場・出荷</button><button role="tab" id="tab-bank" data-panel="bank" aria-controls="panel-bank" aria-selected="false">銀行</button><button role="tab" id="tab-funds" data-panel="funds" aria-controls="panel-funds" aria-selected="false">資金調整</button><button role="tab" id="tab-tap-monitor" data-panel="tap-monitor" aria-controls="panel-tap-monitor" aria-selected="false">不正操作検知</button><button role="tab" id="tab-operations" data-panel="operations" aria-controls="panel-operations" aria-selected="false">運用・設定</button><button role="tab" id="tab-advanced" data-panel="advanced" aria-controls="panel-advanced" aria-selected="false">高度な管理</button></nav><div id="admin-mobile-nav" role="group" aria-label="画面の切替">
+<button id="admin-mobile-toggle" type="button" aria-expanded="false" aria-controls="admin-mobile-options">
+<span id="admin-mobile-current">概要</span><span aria-hidden="true"> ▾</span>
+</button><div id="admin-mobile-options" hidden><button type="button" data-mobile-target="overview">概要</button><button type="button" data-mobile-target="analysis">データ分析</button><button type="button" data-mobile-target="notices">お知らせ</button><button type="button" data-mobile-target="messages">メッセージ</button><button type="button" data-mobile-target="players">参加者</button><button type="button" data-mobile-target="online">オンライン人数</button><button type="button" data-mobile-target="hybrid">サーバー負荷</button><button type="button" data-mobile-target="rankings">ランキング</button><button type="button" data-mobile-target="market">市場・出荷</button><button type="button" data-mobile-target="bank">銀行</button><button type="button" data-mobile-target="funds">資金調整</button><button type="button" data-mobile-target="tap-monitor">不正操作検知</button><button type="button" data-mobile-target="operations">運用・設定</button><button type="button" data-mobile-target="advanced">高度な管理</button></div></div>
+<section id="panel-tap-monitor" role="tabpanel" aria-labelledby="tab-tap-monitor" hidden>
+<h2>不正操作検知</h2>
+<p class="muted">サーバー側で受信したタップ操作の傾向を参考表示します。通信状態やまとめ送りに左右されるため、不正の断定には利用しないでください。自動BAN・操作制限はありません。</p>
+<div class="toolbar"><button type="button" id="tap-monitor-refresh">検知情報を更新</button></div>
+<p id="tap-monitor-status" role="status"></p>
+<div id="tap-monitor-table" class="table-wrap"></div>
+
+<h3>最近の高リスク検知履歴</h3>
+<p class="muted">詳細履歴はこの画面を開いた場合のみ取得します。記録は高リスク時のみ、同一プレイヤーにつき6時間に最大1件です。</p>
+<div id="tap-monitor-events" class="table-wrap"></div>
+</section>
+<section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+<div class="an-title"><div><small class="muted">OPERATIONS ANALYTICS</small><h2>ゲーム分析ダッシュボード</h2></div><p id="analytics-stamp" class="muted">集計データを読み込み中</p></div>
+<div id="stats" class="stats"></div>
+<div id="overview-brief"></div>
+<div class="console-quick-nav">
+<button type="button" data-goto="analysis">データ分析を見る</button>
+<button type="button" data-goto="messages">メッセージを確認</button>
+<button type="button" data-goto="notices">お知らせを管理</button>
+</div>
+</section><section id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
+<div class="an-title"><div><small class="muted">DEEP ANALYTICS</small><h2>データ分析ラボ</h2></div><span class="console-chip">全プレイヤー統計</span></div>
+<div class="an-section-title"><h3>詳細分析</h3><p class="muted">既存の管理者データを再利用します。追加の定期通信は行いません。</p></div>
+<div class="an-toolbar">
+<div class="an-subtabs" role="group" aria-label="分析内容">
+<button type="button" class="an-subtab" data-group="players" aria-pressed="true">資産・クラス</button>
+<button type="button" class="an-subtab" data-group="market" aria-pressed="false">市場の推移</button>
+<button type="button" class="an-subtab" data-group="performance" aria-pressed="false">製造・経営成績</button>
+</div>
+<label class="an-market-range">市場の表示期間 <select id="an-market-window"><option value="30">直近30記録</option><option value="60" selected>直近60記録</option><option value="180">最大180記録</option></select></label>
+</div>
+<div id="analytics-content" aria-live="polite"></div>
+<p class="an-note">グラフは分析用の参考値です。巨大な所持金や製造数は桁数に変換して比較します。通常の取引・資金調整は既存の専用タブで操作できます。</p>
+
+</section>
+
+<section id="panel-notices" role="tabpanel" aria-labelledby="tab-notices" hidden>
+<div class="console-pane-title"><h2>お知らせセンター</h2><span class="console-chip">配信・履歴</span></div>
+<div class="console-switcher"><button class="console-compose-tab" data-compose="no" type="button" aria-pressed="true">配信履歴</button>
+<button class="console-compose-tab" data-compose="yes" type="button" aria-pressed="false">お知らせを作成</button>
+<button id="notice-refresh-proxy" type="button">再読み込み</button></div>
+<div id="notice-inbox-area" class="console-inbox">
+<div id="notice-inbox" class="console-inbox" style="grid-column:1/-1">
+<div id="notice-list" class="console-inbox-list"></div>
+<div id="notice-detail" class="console-inbox-detail"></div>
+</div>
+</div>
+<div id="notice-compose-area" class="console-compose" hidden>
+<form id="announcement-form"><label>お知らせ本文<textarea id="announcement" rows="4" maxlength="500" required></textarea></label>
+ <label>配信先<select id="announcement-audience"><option value="all">全員</option><option value="personal">特定のプレイヤー</option></select></label>
+ <label id="announcement-target-wrap" hidden>送信先の学籍番号<input id="announcement-target" type="text" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" placeholder="例 2101"></label>
+ <div class="toolbar"><button type="submit" class="primary">お知らせを配信</button><button type="button" id="bulletin-refresh">配信履歴を更新</button></div><p id="bulletin-status" role="status"></p></form>
+</div>
+<h3>配信済みのお知らせ</h3><div id="bulletin-admin-posts" class="table-wrap"></div>
+</section>
+<section id="panel-messages" role="tabpanel" aria-labelledby="tab-messages" hidden>
+<div class="console-pane-title"><h2>プレイヤーメッセージ</h2><span class="console-chip">受信トレイ</span></div>
+<div id="message-inbox" class="console-inbox">
+<div id="message-list" class="console-inbox-list"></div>
+<div id="message-detail" class="console-inbox-detail"></div>
+</div>
+<h3>プレイヤーからのメッセージ</h3><div id="bulletin-admin-messages" class="table-wrap"></div>
+</section>
+<section id="panel-advanced" role="tabpanel" aria-labelledby="tab-advanced" hidden>
+<div class="console-pane-title"><h2>高度な管理</h2><span class="console-chip">設定・アカウント</span></div>
+<details><summary>ルールブックを編集</summary>
+<form id="rulebook-form"><label>ルール本文<textarea id="rulebook-editor" rows="14" maxlength="12000"></textarea></label>
+<p>空欄で保存すると標準ルールに戻ります。</p>
+<button type="submit">ルールブックを保存</button></form></details><details id="extra-slots-section" open><summary>追加プレイヤー登録枠の作成・管理</summary>
+ <p class="muted">通常の登録範囲外の数字4桁を追加すると、その番号でプレイヤーが新規登録できます。番号と所属クラス（1～8組）を設定してください。登録枠の作成だけではプレイヤーアカウントは作られません。</p>
+ <form id="extra-slot-form">
+ <div class="toolbar">
+ <label>追加する学籍番号<input id="extra-slot-id" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="例 2999"></label>
+ <label>所属クラス<select id="extra-slot-class"><option value="1">1組</option><option value="2">2組</option><option value="3">3組</option><option value="4">4組</option><option value="5">5組</option><option value="6">6組</option><option value="7">7組</option><option value="8">8組</option></select></label>
+ <button type="submit" class="primary">新しい登録枠を追加</button>
+ </div></form>
+ <p id="extra-slot-status" role="status" aria-live="polite"></p>
+ <h3>追加した学籍番号</h3><div id="extra-slot-list" class="table-wrap"></div>
+ <button id="extra-slot-reload" type="button">追加枠の一覧を更新</button>
+ <p class="muted">未登録の枠は削除できます。すでにプレイヤー登録されている番号は、アカウントを消さない限り削除できません。</p>
+ </details><form id="player-form"><label>学籍番号<input id="target-student" required maxlength="4" inputmode="numeric" pattern="[0-9]{4}"></label>
+  <div class="toolbar"><button type="submit" value="freeze">凍結</button><button type="submit" value="unfreeze">凍結解除</button><button type="submit" value="reset">アカウントをリセット</button></div>
+  <p class="muted">リセットすると登録情報とゲーム進捗を削除します。同じ学籍番号で新規登録できます。</p>
+ </form>
+</section>
+<section id="panel-operations" role="tabpanel" aria-labelledby="tab-operations" hidden>
+<section aria-labelledby="operations-title"><h2 id="operations-title">ゲームの運用</h2>
+ <p id="maintenance-state" role="status"></p>
+ <div class="toolbar"><button id="pause-game">メンテナンス開始</button><button id="resume-game">ゲーム再開</button></div>
+ 
+ 
+ 
+
+
+ 
+ 
+</section>
+</section>
+<section id="panel-players" role="tabpanel" aria-labelledby="tab-players" hidden><h2>参加者と工場</h2><div class="toolbar"><label>名前・学籍番号<input id="search" type="search" placeholder="検索"></label><label>クラス<select id="class"><option value="">全クラス</option><option value="1">1組</option><option value="2">2組</option><option value="3">3組</option><option value="4">4組</option><option value="5">5組</option><option value="6">6組</option><option value="7">7組</option><option value="8">8組</option></select></label></div><p id="count" class="muted"></p><div id="players-table" class="table-wrap"></div><p class="muted">製造数は完成品の累計。純利益は材料費・強化・解放・応援隊代を差し引いた値です。</p></section>
+<section id="panel-hybrid" role="tabpanel" aria-labelledby="tab-hybrid" hidden>
+<h2>Render / Oracle ハイブリッド処理</h2>
+<p class="muted">Oracleが未設定の場合はRenderのみで処理します。数字はこのRenderプロセスの起動以降の累積です。</p>
+<div class="stats">
+<div class="stat"><span>Oracle接続</span><strong id="hybrid-connected">—</strong></div>
+<div class="stat"><span>処理モード設定</span><strong id="hybrid-mode">—</strong></div>
+<div class="stat"><span>処理中のHTTPリクエスト</span><strong id="hybrid-active">—</strong></div>
+<div class="stat"><span>平均API応答時間（近似）</span><strong id="hybrid-latency">—</strong></div>
+</div>
+<p id="hybrid-notice" class="muted" role="status">サーバー状況を読み込みます。</p>
+<button id="hybrid-refresh" type="button">最新状況に更新</button>
+<h3>ルーティング実績</h3>
+<div id="hybrid-metrics" class="table-wrap"></div>
+<p class="muted">計測対象はアプリの通信遅延と同時処理数です。Oracle VMのCPU・メモリ使用率ではありません。</p>
+</section>
+<section id="panel-online" role="tabpanel" aria-labelledby="tab-online" hidden>
+<h2>オンライン人数の推移</h2>
+<p class="muted">直近2分以内にゲームと通信したアカウントを1人として集計。同じアカウントの複数操作は重複しません。</p>
+<div class="stats">
+<div class="stat"><span>現在のオンライン人数</span><strong id="online-count">—</strong></div>
+<div class="stat"><span>表示期間の最大人数</span><strong id="online-peak">—</strong></div>
+<div class="stat"><span>最後の計測</span><strong id="online-updated" style="font-size:16px">—</strong></div>
+</div>
+<div class="toolbar">
+<label>表示期間<select id="online-range"><option value="60">過去1時間</option><option value="360">過去6時間</option><option value="1440" selected>過去24時間</option></select></label>
+<button type="button" id="online-refresh">人数を更新</button>
+</div>
+<div id="online-graph" role="img" aria-label="オンライン人数の時系列グラフ" style="max-width:100%;overflow-x:auto"></div>
+<p id="online-description" class="muted" role="status" aria-live="polite">計測データを読み込みます。</p>
+<p class="muted">1分ごとに計測します。記録がない時間帯は0人とみなさず、グラフに空白として表示します。管理者画面を閉じていてもゲームが稼働している間は記録します。</p>
+</section>
+<section id="panel-rankings" role="tabpanel" aria-labelledby="tab-rankings" hidden><h2>大会のランキング</h2><div class="toolbar"><label>部門<select id="metric"><option value="manufactured">製造個数</option><option value="net_profit">純利益</option><option value="revenue">売上</option></select></label><label>対象<select id="scope"><option value="individual">個人</option><option value="classes">クラス</option></select></label></div><div id="rankings-table" class="table-wrap"></div></section>
+<section id="panel-market" role="tabpanel" aria-labelledby="tab-market" hidden><h2>受付中の出荷</h2><div id="pending-table" class="table-wrap"></div><h2 style="margin-top:22px">市場の精算実績</h2><div id="market-table" class="table-wrap"></div></section>
+<section id="panel-funds" role="tabpanel" aria-labelledby="tab-funds" hidden>
+<h2>個別アカウントへの資金調整</h2>
+<p class="muted">補助金は所持金だけに反映されます。徴収は支出・純利益に反映され、残高がマイナスになる場合も実行できます。</p>
+<form id="funds-form">
+<div class="toolbar">
+<label>対象プレイヤー（学籍番号4桁）<input id="funds-target" type="text" list="funds-options" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="例 2101"><datalist id="funds-options"></datalist></label>
+<label>操作<select id="funds-kind"><option value="grant">補助金を付与</option><option value="collect">資金を徴収</option><option value="forgive">借金帳消し</option></select></label>
+<label id="funds-amount-label">金額（円）<input id="funds-amount" type="text" required placeholder="例 1e+10"></label>
+</div>
+<label>理由・メモ（任意、160文字以内）<input id="funds-note" type="text" maxlength="160" placeholder="例 イベント報酬・ルール違反"></label>
+<p id="funds-preview" class="muted"></p>
+<button id="funds-submit" class="primary" type="submit">確認画面へ</button>
+</form>
+<div id="funds-confirm" hidden>
+<p id="funds-confirm-message"></p>
+<div class="toolbar"><button type="button" class="primary" id="funds-apply">確定して実行</button><button type="button" id="funds-cancel">キャンセル</button></div>
+</div>
+<p id="funds-status" role="status" aria-live="polite"></p>
+<h3>最近の資金調整履歴</h3>
+<div id="funds-history" class="table-wrap"></div>
+<h3>借金帳消し・マイナス所持金回復履歴</h3>
+<div id="debt-history" class="table-wrap"></div>
+<hr style="border:0;border-top:1px solid #d2ddd1;margin:24px 0">
+<h2>財産額による一括資金操作</h2>
+<p class="muted">対象は現在の総資産（所持金＋預け入れの満期受取額＋工場・市場在庫の定価評価額）で判定します。借入残高は差し引きません。下限・上限の空欄は制限なしです。</p>
+<form id="bulk-funds-form">
+<div class="toolbar">
+<label>操作<select id="bulk-funds-kind"><option value="grant">補助金を一括付与</option><option value="collect">資金を一括徴収</option><option value="forgive">借金を一括帳消し</option></select></label>
+<label>総資産の下限（円）<input id="bulk-assets-min" type="text" placeholder="空欄なら制限なし"></label>
+<label>総資産の上限（円）<input id="bulk-assets-max" type="text" placeholder="空欄なら制限なし"></label>
+</div>
+<div class="toolbar">
+<label id="bulk-mode-label">金額の決め方<select id="bulk-amount-mode"><option value="fixed">対象者全員に固定額</option><option value="percent">総資産に対する割合</option></select></label>
+<label id="bulk-fixed-label">1人あたりの金額（円）<input id="bulk-fixed-amount" type="text" value="1000" placeholder="例 1e+6"></label>
+<label id="bulk-percent-label" hidden>総資産に対する割合（％）<input id="bulk-percent-value" type="text" value="10" placeholder="例 10"></label>
+</div>
+<label>理由・メモ（任意）<input id="bulk-note" type="text" maxlength="160" placeholder="例 イベント一括報酬"></label>
+<button id="bulk-preview" type="submit">対象と金額を試算</button>
+</form>
+<div id="bulk-review" hidden>
+<p id="bulk-summary" role="status"></p>
+<div id="bulk-preview-table" class="table-wrap"></div>
+<p class="muted">実行時にもう一度資産を確認します。試算後に金額や対象者が変わった場合は実行を止めます。</p>
+<div class="toolbar"><button id="bulk-apply" class="primary" type="button">表示内容で一括実行</button><button id="bulk-cancel" type="button">キャンセル</button></div>
+</div>
+<p id="bulk-status" role="status" aria-live="polite"></p>
+</section>
+<section id="panel-bank" role="tabpanel" aria-labelledby="tab-bank" hidden><details class="an-fold" open><summary>銀行・税率の設定</summary>
+<h2>銀行・市場調整</h2>
+<form id="bank-config">
+<label><input name="enabled" type="checkbox"> 新規の貸し借りと売上税を有効にする</label>
+<div class="toolbar">
+<label>1時間の需要率（％）<input name="demand" type="text" required></label>
+<label>貸出利率（％）<input name="lend" type="text" required></label>
+<label>借入利率（％）<input name="borrow" type="text" required></label>
+<label>契約上限（円）<input name="limit" type="text" placeholder="例 1.25e+4" required></label>
+</div>
+<label>累進税率（1行に「売上の下限, 税率％」）<textarea name="brackets" rows="4" placeholder="0,0&#10;10000,5&#10;100000,10"></textarea></label>
+<p class="muted">各区分を超えた売上部分にその税率を適用します。空欄なら課税なし。</p>
+<fieldset><legend>指数課税</legend>
+<label><input name="use_exponential" type="checkbox"> 売上課税（従来方式）：区分ごとに税率と幅を2倍にする</label>
+<label>課税開始の累計売上（円）<input name="tax_start" value="1e+16"></label>
+<label>最初の課税区分の幅（円）<input name="tax_step" value="1e+16"></label>
+<label>最初の税率（％）<input name="tax_base" value="10"></label>
+
+<p class="muted">有効時は上の累進税率表の代わりに適用します。すでに稼いだ売上も税率の判定に使います。税率に上限はなく、税額が売上を超えると所持金が減ります。</p>
+</fieldset><button type="submit" disabled>銀行設定を保存</button>
+</form>
+</details><details class="an-fold"><summary>総資産への指数課税</summary><h3>総資産への指数課税</h3>
+<p>保存した指数課税の条件を、累計売上に代えて総資産へ適用します。総資産は所持金、満期受取額、工場・店頭在庫の定価評価額の合計です。実行するたびに、その時点の資産に対して一度課税します。さらに、所持金・預金・在庫定価評価額を合算した総資産課税は売上課税と異なり、基本の課税区分の幅と税率が段階ごとに10倍になります。さらに総資産の指数が1000未満では10増えるごと、1000以上2000未満では5増えるごと、2000以上では2増えるごとに追加課税倍率が10倍になります。試算を確認してから実行してください。</p>
+<button type="button" id="asset-tax-preview" disabled>課税額を試算</button>
+<div id="asset-tax-review" hidden>
+<p id="asset-tax-summary"></p>
+<button type="button" id="asset-tax-apply">現在の資産に課税する</button>
+</div>
+</details><details class="an-fold"><summary>市場の買い取り・出品</summary><h3>市場の買い取り・出品</h3>
+<p id="bank-offers"></p>
+<form id="bank-market">
+<label>商品<select id="bank-market-product" name="product"><option value="white">てるてる坊主</option><option value="sea">海坊主</option><option value="shisa">シーサー坊主</option></select></label>
+<label>数量<input name="quantity" type="text" placeholder="例 1.25e+4" required></label>
+<label>銀行の出品単価（円）<input name="price" type="text" value="100"></label>
+<button type="submit" name="kind" value="buyout" disabled>安い出品から買い取る</button>
+<button type="submit" name="kind" value="offer" disabled>銀行の出品を設定</button>
+<p class="muted">買い取りは確認後に即時成立します。出品は指定個数で置き換わり、購入または市場の精算で売れます。0個で取り下げます。</p>
+</form>
+<div id="bank-market-confirm" hidden>
+<p id="bank-market-confirm-text"></p>
+<button type="button" id="bank-market-apply">実行する</button>
+<button type="button" id="bank-market-cancel">キャンセル</button>
+</div>
+<p id="admin-bank-status" role="status"></p>
+</details></section>
+</div><p id="notice" role="status" aria-live="polite"></p><footer class="muted">管理者専用 · 集計データは「更新する」で読み込みます</footer><div id="console-record-dialog" class="console-modal" role="dialog" aria-modal="true" aria-label="一覧項目の詳細" hidden>
+<div class="console-modal-card"><div class="console-pane-title"><h3>レコードの詳細</h3>
+<button type="button" id="console-record-close">閉じる</button></div>
+<div id="console-record-fields" class="console-modal-content"></div></div></div></main><script src="/numbers.js" defer></script><script src="/tabs.js" defer></script><script src="/admin.js" defer></script><script src="/admin-ux.js" defer></script><script src="/admin-cockpit.js" defer></script><script src="/admin-insight-lab.js" defer></script></body></html>
