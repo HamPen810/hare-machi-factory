@@ -9,6 +9,7 @@ from sparse_exact_v1 import SparseExact as S
 from sparse_exact_division import mul_ratio_floor
 from v2_real_schema_staging_trade import _guard
 from v2_global_operation_registry import initialize as init_registry, check as check_registry, register as register_op
+from v2_stage_event_ledger import initialize as init_ledger, emit as emit_event
 
 Z=S.parse("0")
 
@@ -39,6 +40,7 @@ def initialize_stage(conn):
     _guard(conn)
     with conn.transaction():
         init_registry(conn)
+        init_ledger(conn)
         conn.execute("""CREATE TABLE IF NOT EXISTS hare_factory.v2_action_receipts_stage(
           op_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result JSONB NOT NULL)""")
         conn.execute("""CREATE TABLE IF NOT EXISTS hare_factory.v2_bank_contracts_stage(
@@ -71,6 +73,18 @@ def action(conn,op_id,kind,player,**payload):
         if registry_replay:
             raise ValueError("Registry contains operation without its receipt")
         cash,tier=_locked(conn,player)
+        # Snapshot exact pre-operation values. This is in the same transaction
+        # as all subsequent writes, under locks, for ledger reconciliation.
+        tracked_product=payload.get("product","white") if kind in (
+            "manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price") else None
+        stock_before=None
+        if tracked_product is not None:
+            first_stock=conn.execute(
+                "SELECT quantity_v2 FROM hare_factory.stock "
+                "WHERE player=%s AND product=%s FOR UPDATE",
+                (player,tracked_product)).fetchone()
+            if first_stock is not None and first_stock[0] is not None:
+                stock_before=v(first_stock[0])
         result={}
         if kind in ("manufacture","upgrade","ship","edit_shipment","cancel_shipment","set_price"):
             product=payload.get("product","white")
@@ -170,6 +184,25 @@ def action(conn,op_id,kind,player,**payload):
             conn.execute("DELETE FROM hare_factory.v2_bank_contracts_stage WHERE op_id=%s",
                          (payload["contract_id"],))
             result={"settled":due.serialize(),"cash":changed.serialize()}
+        # Ledger event and both idempotency receipts commit atomically with
+        # cash, inventory, contracts, and shipment modifications.
+        final_cash=v(conn.execute(
+            "SELECT cash_v2 FROM hare_factory.factories WHERE player=%s",(player,)
+        ).fetchone()[0])
+        stock_delta=Z
+        if tracked_product is not None and stock_before is not None:
+            final_stock=conn.execute(
+                "SELECT quantity_v2 FROM hare_factory.stock "
+                "WHERE player=%s AND product=%s",(player,tracked_product)
+            ).fetchone()
+            if final_stock is not None:
+                stock_delta=v(final_stock[0])-stock_before
+        produced=v(result["produced"]) if kind=="manufacture" else Z
+        expense=v(result["spent"]) if kind=="upgrade" else (
+            positive(payload["amount"]) if kind=="admin_collect" else Z)
+        emit_event(conn,op_id=op_id,player=player,role="actor",kind=kind,
+                   product=tracked_product,cash=final_cash-cash,
+                   stock=stock_delta,manufactured=produced,expense=expense)
         register_op(conn,op_id,"v2_action",fingerprint)
         conn.execute("INSERT INTO hare_factory.v2_action_receipts_stage VALUES(%s,%s,%s)",
                      (op_id,fingerprint,json.dumps(result)))
