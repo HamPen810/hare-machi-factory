@@ -6,6 +6,8 @@ on:
     paths:
       - deployment/v2_real_schema_staging_actions.py
       - deployment/test_v2_real_schema_staging_actions.py
+      - deployment/v2_stage_upgrade_pricing.py
+      - deployment/test_v2_stage_upgrade_pricing.py
       - .github/workflows/v2-stage-unlock-postgres.yml
   workflow_dispatch:
 permissions:
@@ -38,6 +40,6 @@ jobs:
       - name: Test exact action updates, real-shaped schema and unlock retry safety
         run: |
           cd deployment
-          python -m unittest -v test_v2_real_schema_staging_actions
+          python -m unittest -v test_v2_stage_upgrade_pricing test_v2_real_schema_staging_actions
       - name: Ensure live production ZIP was not changed
         run: git diff --exit-code -- hare-machi-render.zip
