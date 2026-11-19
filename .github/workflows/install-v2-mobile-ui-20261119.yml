@@ -1,4 +1,4 @@
-name: V2 mobile HTML calculator integration
+name: V2 mobile HTML calculator integration (safe static route retry)
 on:
   push:
     paths:
