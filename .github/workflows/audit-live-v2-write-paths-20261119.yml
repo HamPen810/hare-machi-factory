@@ -1,0 +1,17 @@
+name: Audit actual production financial mutation and V2 display coverage
+on:
+  push:
+    paths:
+      - .github/workflows/audit-live-v2-write-paths-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-without-writing:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect exact current production server, market, banking, admin, ranking and chart code
+        run: |
+          python deployment/audit-live-v2-write-paths-20261119.py
+          git diff --exit-code -- hare-machi-render.zip
