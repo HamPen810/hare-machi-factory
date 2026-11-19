@@ -115,5 +115,57 @@ class V2LedgerAtomicityTests(unittest.TestCase):
         assert_amount(self,response["cash_change"],"-1e1000000000")
         assert_amount(self,response["expenses"],"1e1000000000")
 
+    def test_bank_contracts_repaid_and_ledger_cash_net_zero(self):
+        first=action(self.db,"ledger-borrow-bank-001","bank_borrow","buyer",
+                     amount="1e1000000000",interest_bps=0)
+        second=action(self.db,"ledger-deposit-bank-1","bank_lend","buyer",
+                      amount="10",interest_bps=0)
+        action(self.db,"ledger-withdraw-bank-1","bank_withdraw","buyer",
+               contract_id=second["contract_id"])
+        action(self.db,"ledger-repay-bank-001","bank_repay","buyer",
+               contract_id=first["contract_id"])
+        self.assertEqual(self.db.execute(
+            "SELECT count(*) FROM hare_factory.v2_bank_contracts_stage"
+        ).fetchone()[0],0)
+        ledger=metrics(self.db)["players"]["buyer"]
+        assert_amount(self,ledger["cash_change"],"0")
+        cash=self.db.execute(
+            "SELECT cash_v2 FROM hare_factory.factories WHERE player='buyer'"
+        ).fetchone()[0]
+        assert_amount(self,cash,"10")
+        self.assertEqual(len(timeline(self.db,"buyer")),4)
+
+    def test_ship_edit_cancel_and_price_ledger_conserves_stock(self):
+        action(self.db,"ledger-ship-cancel-1","ship","seller",
+               product="white",quantity="5",price="3")
+        action(self.db,"ledger-ship-edit-001","edit_shipment","seller",
+               product="white",quantity="3",price="7")
+        action(self.db,"ledger-price-edit-1","set_price","seller",
+               product="white",price="8")
+        action(self.db,"ledger-ship-refund-1","cancel_shipment","seller",
+               product="white")
+        inventory=S.parse("0")
+        for event in timeline(self.db,"seller"):
+            inventory=inventory+S.deserialize(event["stock_delta_v2"])
+        self.assertEqual(inventory.sign(),0)
+        self.assertEqual(self.db.execute(
+            "SELECT count(*) FROM hare_factory.listings"
+        ).fetchone()[0],0)
+        stock=self.db.execute(
+            "SELECT quantity_v2 FROM hare_factory.stock WHERE player='seller'"
+        ).fetchone()[0]
+        assert_amount(self,stock,"10")
+
+    def test_negative_admin_cash_collection_and_forgiveness_reconcile(self):
+        action(self.db,"ledger-admin-collect-2","admin_collect","buyer",amount="200")
+        action(self.db,"ledger-admin-forgive-2","admin_forgive","buyer")
+        bank=metrics(self.db)["players"]["buyer"]
+        assert_amount(self,bank["expenses"],"200")
+        assert_amount(self,bank["cash_change"],"-10")
+        cash=self.db.execute(
+            "SELECT cash_v2 FROM hare_factory.factories WHERE player='buyer'"
+        ).fetchone()[0]
+        assert_amount(self,cash,"0")
+
 if __name__=="__main__":
     unittest.main()
