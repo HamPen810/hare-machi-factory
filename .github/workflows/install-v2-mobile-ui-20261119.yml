@@ -1,0 +1,64 @@
+name: V2 mobile HTML calculator integration
+on:
+  push:
+    paths:
+      - .github/workflows/install-v2-mobile-ui-20261119.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hare-v2-mobile-ui
+  cancel-in-progress: false
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Validate V2 calculator client JavaScript
+        run: node --check deployment/v2_ui.js
+      - name: Install safe V2 calculator page into production ZIP
+        run: python deployment/install-v2-mobile-ui-20261119.py
+      - name: Validate every Python module and JavaScript asset
+        run: |
+          mkdir -p /tmp/hare-v2-src /tmp/hare-v2-scripts
+          python - <<'PY'
+          import ast
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('hare-machi-render.zip') as z:
+              assert z.testzip() is None
+              for name in z.namelist():
+                  if name.endswith('.py'):
+                      ast.parse(z.read(name).decode(),filename=name)
+                      Path('/tmp/hare-v2-src',name).write_bytes(z.read(name))
+                  elif name.startswith('static/'):
+                      target=Path('/tmp/hare-v2-src',name)
+                      target.parent.mkdir(parents=True,exist_ok=True)
+                      target.write_bytes(z.read(name))
+                      if name.endswith('.js'):
+                          Path('/tmp/hare-v2-scripts',Path(name).name).write_bytes(z.read(name))
+                  elif name=='rules-default.txt':
+                      Path('/tmp/hare-v2-src/rules-default.txt').write_bytes(z.read(name))
+              assert b'v2-lab-link' in z.read('static/index.html')
+              assert b'/api/v2/preview' in z.read('static/v2.js')
+              assert b'simulation_only' in z.read('static/v2.js')
+              server=z.read('server.py').decode()
+              assert "if not write and self.path in ('/v2', '/v2.js'):" in server
+              assert "if write and self.path=='/api/v2/preview':" in server
+              print('V2_UI_AND_EXISTING_SERVER_VERIFIED')
+          PY
+          for js in /tmp/hare-v2-scripts/*.js; do node --check "$js"; done
+      - name: Simulate login, economic APIs and V2 page on disposable SQLite
+        run: PYTHONPATH=/tmp/hare-v2-src python deployment/test-html-http-smoke-20261119.py
+      - name: Run exact-money regression suite
+        run: |
+          cd deployment
+          python -m unittest -v test_v2_purchase_preview test_v2_balance_read test_sparse_exact_v1 test_sparse_exact_division
+      - name: Push only verified production ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hare-machi-render.zip
+          git diff --cached --quiet || { git commit -m "Add mobile V2 huge-number simulator UI"; git push; }
