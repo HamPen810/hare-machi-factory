@@ -1,4 +1,4 @@
-name: V2 real game table actions Postgres transaction test
+name: V2 real game table actions Postgres transaction test (corrected stock fixture)
 on:
   push:
     paths:
