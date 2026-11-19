@@ -7,6 +7,7 @@ columns are never changed. Not approved for production cutover.
 import hashlib,json
 from sparse_exact_v1 import SparseExact as S
 from sparse_exact_division import mul_ratio_floor
+from v2_stage_upgrade_pricing import upgrade_price
 from v2_real_schema_staging_trade import _guard
 from v2_global_operation_registry import initialize as init_registry, check as check_registry, register as register_op
 from v2_stage_event_ledger import initialize as init_ledger, emit as emit_event
@@ -131,7 +132,8 @@ def action(conn,op_id,kind,player,**payload):
                 ((v(row[0])+cost).serialize(),player))
             result={"unlocked":product,"spent":cost.serialize()}
         elif kind=="upgrade":
-            cost=positive(payload["cost"])
+            # Server-authoritative cost uses the locked tier; ignore client cost.
+            cost=upgrade_price(tier)
             if cash.compare(cost)<0:raise ValueError("Insufficient money")
             conn.execute("UPDATE hare_factory.factories SET cash_v2=%s,tier=tier+1 WHERE player=%s",
                          ((cash-cost).serialize(),player))
