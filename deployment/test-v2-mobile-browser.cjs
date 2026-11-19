@@ -28,6 +28,20 @@ async function main(){
     if(req.url().endsWith('/preview')){
      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(preview)});
     }
+    if(req.url().endsWith('/ranks')){
+      const ranked=Object.fromEntries(['manufactured','revenue','net_profit'].map(metric=>[
+        metric,{individual:[{id:'1',rank:1,display_name:'Test',class_number:1,[metric]:'S1:1@7600'}],
+                classes:[{class_number:1,rank:1,[metric]:'S1:1@7600'}]}]));
+      return route.fulfill({status:200,contentType:'application/json',
+        body:JSON.stringify({format:'S1',authoritative:'legacy_numeric',rankings:ranked})});
+    }
+    if(req.url().endsWith('/data')){
+      return route.fulfill({status:200,contentType:'application/json',
+        body:JSON.stringify({format:'S1',timeline:[
+          {round:1,product:'white',revenue:'S1:1@7600'},
+          {round:2,product:'white',revenue:'S1:2@8000'}
+        ],timeline_more:false,breakdown:{income:[],expense:[]}})});
+    }
     return route.fulfill({status:404,contentType:'application/json',body:'{}'});
    });
    await page.goto(base,{waitUntil:'domcontentloaded'});
@@ -50,6 +64,13 @@ async function main(){
    });
    assert.ok((await page.locator('#results').textContent()).includes('S1:2@1000001000'));
    assert.ok((await page.locator('body').textContent()).includes('試算専用'));
+   await page.locator('#v2-rank-form button').click();
+   await page.locator('#v2-rank-result table').waitFor({timeout:10000});
+   assert.ok((await page.locator('#v2-rank-result').textContent()).includes('1.0000e+7600'));
+   await page.locator('#v2-data-load').click();
+   await page.locator('#v2-data-result svg').waitFor({timeout:10000});
+   assert.ok((await page.locator('#v2-data-result').textContent()).includes('e+8000'));
+
    const geometry=await page.evaluate(()=>({width:document.documentElement.scrollWidth,inner:innerWidth}));
    assert.ok(geometry.width<=geometry.inner+2,'Unwanted horizontal scrolling: '+JSON.stringify({viewport,geometry}));
    await page.screenshot({path:'/tmp/v2-ui-'+viewport.width+'.png',fullPage:true});
