@@ -1,4 +1,4 @@
-name: Full gameplay and admin regression matrix for V2 cutover
+name: Full gameplay and admin regression matrix for V2 cutover (revised rules)
 on:
   push:
     paths:
