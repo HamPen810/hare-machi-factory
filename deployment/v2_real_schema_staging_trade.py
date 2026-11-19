@@ -12,6 +12,7 @@ import os
 from sparse_exact_v1 import SparseExact as S
 from sparse_exact_division import mul_ratio_floor
 from v2_global_operation_registry import initialize as init_registry, check as check_registry, register as register_op
+from v2_stage_event_ledger import initialize as init_ledger, emit as emit_event
 
 RECEIPTS = "hare_factory.v2_trade_receipts_stage"
 ZERO = S.parse("0")
@@ -38,6 +39,7 @@ def create_staging_receipts(conn):
     _guard(conn)
     with conn.transaction():
         init_registry(conn)
+        init_ledger(conn)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS hare_factory.v2_trade_receipts_stage (
                 op_id TEXT PRIMARY KEY,
@@ -129,6 +131,10 @@ def settle(conn, op_id, buyer, seller, product, quantity_text, unit_price_text,
                 "WHERE player=%s AND product=%s",
                 (next_stock[player],player,product)).rowcount!=1:
                 raise RuntimeError("Missing stock row")
+        emit_event(conn,op_id=op_id,player=buyer,role="buyer",kind="market_buy",
+                   product=product,cash=-gross,stock=quantity,expense=gross)
+        emit_event(conn,op_id=op_id,player=seller,role="seller",kind="market_sell",
+                   product=product,cash=gross-fee,stock=-quantity,revenue=gross)
         register_op(conn,op_id,"v2_trade",fingerprint)
         conn.execute(
             "INSERT INTO "+RECEIPTS+
