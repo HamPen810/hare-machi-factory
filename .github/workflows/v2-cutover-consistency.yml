@@ -6,6 +6,8 @@ on:
     paths:
       - deployment/v2_cutover_consistency_gate.py
       - deployment/test_v2_cutover_consistency_gate.py
+      - deployment/v2_live_schema_preflight.py
+      - deployment/test_v2_live_schema_preflight.py
       - .github/workflows/v2-cutover-consistency.yml
   workflow_dispatch:
 permissions:
@@ -16,6 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run isolated lossless consistency gate tests
-        run: PYTHONPATH=deployment python -m unittest -v deployment.test_v2_cutover_consistency_gate
+        run: PYTHONPATH=deployment python -m unittest -v deployment.test_v2_cutover_consistency_gate deployment.test_v2_live_schema_preflight
       - name: Compile audit and all staged V2 modules
         run: python -m compileall -q deployment/v2_cutover_consistency_gate.py deployment/test_v2_cutover_consistency_gate.py
