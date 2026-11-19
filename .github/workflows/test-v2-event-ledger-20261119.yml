@@ -1,4 +1,4 @@
-name: Exact V2 economic ledger and chart source consistency (bank and shipment cancellation)
+name: Exact V2 economic ledger and chart source consistency (forgiveness delta regression)
 on:
   push:
     paths:
