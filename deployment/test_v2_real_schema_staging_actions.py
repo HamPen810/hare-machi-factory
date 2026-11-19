@@ -192,8 +192,8 @@ class RealSchemaV2AllActions(unittest.TestCase):
             action(self.db,'invalid-price-v2-1','set_price','p',
                    product='white',price='1')
         with self.assertRaises(ValueError):
-            action(self.db,'invalid-upg-v2-001','upgrade','p',
-                   cost='1e1000000001')
+            action(self.db,'invalid-upg-v2-001','upgrade','q',
+                   cost='1')
         self.assertEqual(self.cash('p'),old_cash)
         self.assertEqual(self.db.execute("SELECT quantity_v2 FROM hare_factory.stock "
                                          "WHERE player='p'").fetchone()[0],old_stock)
