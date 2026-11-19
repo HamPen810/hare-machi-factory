@@ -11,6 +11,7 @@ CREATE TABLE factory_totals(player TEXT, manufactured INTEGER, purchases INTEGER
 CREATE TABLE bank_accounts(player TEXT, tax INTEGER);
 CREATE TABLE sales(player_id TEXT, product_id TEXT, sold_quantity INTEGER, unit_price INTEGER, unit_cost INTEGER);
 CREATE TABLE actions(player TEXT, payload TEXT, result TEXT);
+CREATE TABLE admin_fund_transfers(player_id TEXT,kind TEXT,amount NUMERIC);
 """)
 db.execute("INSERT INTO players VALUES ('p','Player',1)")
 db.execute("INSERT INTO factory_totals VALUES ('p',5,7)")
