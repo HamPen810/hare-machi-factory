@@ -70,8 +70,7 @@ class RealSchemaV2AllActions(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM hare_factory.listings").fetchone()[0],0)
         s=self.db.execute("SELECT quantity_v2 FROM hare_factory.stock "
                           "WHERE player='p'").fetchone()[0]
-        self.assertEqual(compare(s,'1e800000000+1') if False else
-                         S.deserialize(s).compare(S.parse('10e700000000')+S.parse('1e800000000')),0)
+        self.assertEqual(S.deserialize(s).compare(S.parse('10e700000000')+S.parse('1e800000000')),0)
 
     def test_bank_loan_deposit_multiple_contract_repay(self):
         action(self.db,'borrow-v2-test-001','bank_borrow','q',amount='1e900000000',
